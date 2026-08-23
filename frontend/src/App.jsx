@@ -26,54 +26,9 @@ import {
 
 const API_BASE = "http://localhost:8000";
 
-// Standard sample poems for offline mock fallback
-const CLIENT_MOCK_POEMS = [
-  {
-    id: 101,
-    title: "रात और चाँद",
-    original_text: "चाँदनी रात में बहती हुई ठंडी हवा,\nमुस्कुराहट तेरी सब कुछ बदल देती है।\nख़ामोश खड़े हैं रास्ते और पेड़ यहाँ,\nदिल की धड़कन आज कुछ नया कहती है।",
-    language: "Hindi",
-    source: "google_keep",
-    google_keep_id: "keep_poem_1",
-    tags: "Romantic,Nature",
-    category: "Ghazal",
-    is_draft: true,
-    is_published: false,
-    is_archived: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  {
-    id: 102,
-    title: "हम देखेंगे",
-    original_text: "हम देखेंगे, लाज़िम है कि हम भी देखेंगे,\nवो दिन कि जिसका वादा है,\nजो लोह-ए-अज़ल में लिक्खा है।\nजब ज़ुल्म-ओ-सितम के कोह-ए-गिराँ,\nरूई की तरह उड़ जाएँगे।",
-    language: "Urdu",
-    source: "google_keep",
-    google_keep_id: "keep_poem_2",
-    tags: "Revolutionary,Hope",
-    category: "Nazm",
-    is_draft: true,
-    is_published: false,
-    is_archived: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  {
-    id: 103,
-    title: "पीर पर्वत सी",
-    original_text: "हो गई है पीर पर्वत सी पिघलनी चाहिए,\nइस हिमालय से कोई गंगा निकलनी चाहिए।\nआज यह दीवार परदों की तरह हिलने लगी,\nशर्त लेकिन थी कि ये बुनियाद हिलनी चाहिए।",
-    language: "Hindi",
-    source: "google_keep",
-    google_keep_id: "keep_poem_3",
-    tags: "Inspirational,Social",
-    category: "Dushyant",
-    is_draft: true,
-    is_published: false,
-    is_archived: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-];
+// Standard sample poems for offline fallback
+const CLIENT_MOCK_POEMS = [];
+
 
 export default function App() {
   // Navigation & Core State

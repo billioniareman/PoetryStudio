@@ -1,6 +1,7 @@
 from app.agents.nodes import HindiSyllabifier
 from app.agents.workflow import poetry_app
-from app.agents.fetch_agent import fetch_notes_from_keep
+from app.agents import fetch_agent
+from unittest.mock import patch
 
 def test_hindi_syllabifier():
     print("Testing Hindi Syllabifier matra counting...")
@@ -22,8 +23,10 @@ def test_hindi_syllabifier():
 
 def test_keep_mocks():
     print("Testing Keep mocks...")
-    notes = fetch_notes_from_keep()
-    assert len(notes) > 0
+    test_notes = [{"title": "Test Poem", "text": "Lines"}]
+    with patch("app.agents.fetch_agent.fetch_notes_from_keep", return_value=test_notes):
+        notes = fetch_agent.fetch_notes_from_keep()
+        assert len(notes) > 0
     print(f"Successfully loaded {len(notes)} mock notes.")
 
 def test_langgraph_compilation():

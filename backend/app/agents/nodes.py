@@ -25,13 +25,103 @@ logger = logging.getLogger("poetrystudio.nodes")
 PROMPTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../prompts"))
 
 def load_prompt(filename: str) -> str:
-    path = os.path.join(PROMPTS_DIR, filename)
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    # Fallback default templates if file not found
-    logger.warning(f"Prompt file not found at: {path}. Using fallback.")
-    return ""
+    # 1. Search multiple candidate paths
+    candidate_dirs = [
+        PROMPTS_DIR,
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../prompts")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../prompts")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "../prompts")),
+        "/prompts",
+        "/app/prompts",
+    ]
+    for d in candidate_dirs:
+        path = os.path.join(d, filename)
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    return f.read()
+            except Exception:
+                pass
+
+    logger.warning(f"Prompt file {filename} not found in candidates. Using robust fallback.")
+    
+    # 2. Strict JSON-enforcing fallback templates
+    fallbacks = {
+        "translation.txt": (
+            "You are a professional literary translator.\n"
+            "Translate the following poem to {target_language}.\n"
+            "Poem:\n{original_text}\n\n"
+            "Output ONLY the translated poem text. Do not add comments or markdown formatting."
+        ),
+        "meter.txt": (
+            "You are a master of classical Hindi and Urdu poetry meter (Bahr, Matra, Chhand).\n"
+            "A line in the poem has a rhythm/meter mismatch.\n\n"
+            "Original Poem:\n{original_text}\n\n"
+            "Mismatched Line Details:\n"
+            "Line Number: {line_number}\n"
+            "Line Text: {line_text}\n"
+            "Current Matra Count: {current_matra}\n"
+            "Target Matra Count: {target_matra}\n\n"
+            "Output a structured JSON object with these keys:\n"
+            "{{\n"
+            '  "reason": "Brief explanation of the rhythm issue",\n'
+            '  "suggestions": [\n'
+            "    {{\n"
+            '      "replace": "the word in the line to replace",\n'
+            '      "with": "the suggested word",\n'
+            '      "reason": "why it fits the target matra"\n'
+            "    }}\n"
+            "  ]\n"
+            "}}\n"
+            "Only output the raw JSON object. Do not wrap in markdown or add conversational preamble."
+        ),
+        "audience_romantic.txt": (
+            "You are a passionate Romantic Poetry Lover. You read poetry for its raw emotion and depth of feeling.\n"
+            "Review the following poem:\n{original_text}\n\n"
+            "Output a structured JSON object with these keys:\n"
+            "{{\n"
+            '  "rating": 8,\n'
+            '  "strengths": ["emotional strengths"],\n'
+            '  "weaknesses": ["emotional weaknesses"],\n'
+            '  "favorite_line": "favorite line",\n'
+            '  "confusing_line": "confusing line or null",\n'
+            '  "suggestion": "how to make emotional impact stronger",\n'
+            '  "final_emotion": "primary emotion"\n'
+            "}}\n"
+            "Only output the raw JSON object. Do not wrap in markdown or add conversational preamble."
+        ),
+        "audience_critic.txt": (
+            "You are a rigorous, academic Literary Critic looking for imagery, structure, and craft.\n"
+            "Review the following poem:\n{original_text}\n\n"
+            "Output a structured JSON object with these keys:\n"
+            "{{\n"
+            '  "rating": 7,\n'
+            '  "strengths": ["craft/imagery strengths"],\n'
+            '  "weaknesses": ["structural/cliche flaws"],\n'
+            '  "favorite_line": "best crafted line",\n'
+            '  "confusing_line": "problematic line or null",\n'
+            '  "suggestion": "how to refine structure/imagery",\n'
+            '  "final_emotion": "craftsmanship impression"\n'
+            "}}\n"
+            "Only output the raw JSON object. Do not wrap in markdown or add conversational preamble."
+        ),
+        "audience_instagram.txt": (
+            "You are a modern Instagram Reader looking for catchy hooks and high shareability.\n"
+            "Review the following poem:\n{original_text}\n\n"
+            "Output a structured JSON object with these keys:\n"
+            "{{\n"
+            '  "rating": 9,\n'
+            '  "strengths": ["reasons why it is relatable/catchy"],\n'
+            '  "weaknesses": ["reasons why reader might scroll past"],\n'
+            '  "favorite_line": "most quoteable line/couplet",\n'
+            '  "confusing_line": "archaic or slow reading line or null",\n'
+            '  "suggestion": "how to improve hook/visual layout",\n'
+            '  "final_emotion": "vibe/mood projects"\n'
+            "}}\n"
+            "Only output the raw JSON object. Do not wrap in markdown or add conversational preamble."
+        )
+    }
+    return fallbacks.get(filename, "")
 
 # Hindi Phonetic Matra Counting Algorithm
 class HindiSyllabifier:
