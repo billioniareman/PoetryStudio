@@ -51,6 +51,43 @@ def get_poems(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     service = PoemService(db)
     return service.get_poems_list(skip, limit)
 
+@app.post("/poems", response_model=schemas.PoemResponse)
+def create_poem(poem_in: schemas.PoemCreate, db: Session = Depends(get_db)):
+    service = PoemService(db)
+    poem = service.poem_repo.create(
+        title=poem_in.title or "Untitled",
+        original_text=poem_in.original_text,
+        language=poem_in.language or "Hindi",
+        source=poem_in.source or "manual"
+    )
+    # Also initialize a default empty version
+    service.ver_repo.create_version(
+        poem_id=poem.id,
+        content=poem_in.original_text,
+        created_by="user",
+        diff_summary="Created poem"
+    )
+    return poem
+
+@app.post("/poems/{poem_id}/translate")
+def translate_poem_live(poem_id: int, payload: dict = {}, db: Session = Depends(get_db)):
+    service = PoemService(db)
+    poem = service.poem_repo.get_by_id(poem_id)
+    if not poem:
+        raise HTTPException(status_code=404, detail="Poem not found")
+    
+    original_text = payload.get("original_text") or poem.original_text
+    
+    from ..core.llm import get_llm_model
+    llm = get_llm_model()
+    prompt = f"Translate the following poem/text to Hindi. Output ONLY the translated text, no explanation or markdown:\n{original_text}"
+    response = llm.invoke(prompt)
+    translated_text = response.content.strip()
+    
+    # Save it to database
+    service.trans_repo.save_translation(poem_id, "Hindi", translated_text)
+    return {"translation": translated_text}
+
 @app.get("/poems/{poem_id}")
 def get_poem(poem_id: int, db: Session = Depends(get_db)):
     service = PoemService(db)

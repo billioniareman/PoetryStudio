@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,99 +6,84 @@
 
 body {
   margin: 0;
-  background-color: #0b0714;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(45, 15, 80, 0.25) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(90, 60, 20, 0.15) 0px, transparent 50%);
-  color: #f5e6ff;
-  font-family: 'Outfit', 'Inter', sans-serif;
+  background-color: #fbf9f4; /* surface background */
+  color: #1b1c19; /* on-surface */
+  font-family: 'Inter', sans-serif;
   min-height: 100vh;
 }
 
-/* Glassmorphism custom styling */
-.glass {
-  background: rgba(18, 13, 31, 0.5);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(212, 175, 55, 0.12);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+/* Focused environment layout transition */
+.sidebar-transition {
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.glass-dark {
-  background: rgba(9, 7, 18, 0.8);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(212, 175, 55, 0.08);
+body.focus-mode .sidebar-transition {
+  opacity: 0 !important;
+  transform: translateX(-50px);
+  pointer-events: none;
 }
 
-.glass-accent {
-  background: rgba(212, 175, 55, 0.03);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(212, 175, 55, 0.25);
+body.focus-mode .sidebar-transition-right {
+  opacity: 0 !important;
+  transform: translateX(50px);
+  pointer-events: none;
 }
 
-.glass-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+body.focus-mode .top-nav-transition {
+  opacity: 0 !important;
+  transform: translateY(-100%);
+  pointer-events: none;
 }
 
-.glass-hover:hover {
-  background: rgba(23, 17, 43, 0.7);
-  border-color: rgba(212, 175, 55, 0.35);
-  box-shadow: 0 0 20px rgba(212, 175, 55, 0.15);
+/* Ambient shadow on lifting paper sheet */
+.ambient-shadow {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ambient-shadow:hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
   transform: translateY(-2px);
 }
 
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 12, 27, 0.5);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(212, 175, 55, 0.3);
-  border-radius: 3px;
+  background: #e4e2dd;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(212, 175, 55, 0.6);
-}
-
-/* Poetry Textarea Styles */
-.poetry-editor {
-  font-family: 'Merriweather', 'Georgia', serif;
-  line-height: 2;
-  font-size: 1.15rem;
-  background: transparent;
-  resize: none;
-  outline: none;
-}
-
-/* Animations */
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 10px rgba(212, 175, 55, 0.1);
-    border-color: rgba(212, 175, 55, 0.15);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
-    border-color: rgba(212, 175, 55, 0.5);
-  }
-}
-
-.glow-active {
-  animation: pulse-glow 2s infinite ease-in-out;
+  background: #c4c7c7;
 }
 
 /* Diff viewer styles */
 .diff-added {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #065f46;
+  border-radius: 2px;
+  padding: 0 2px;
 }
 .diff-removed {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #991b1b;
   text-decoration: line-through;
+  border-radius: 2px;
+  padding: 0 2px;
 }
 .diff-info {
-  color: #60a5fa;
+  color: #1e3a8a;
+  font-weight: 500;
+}
+
+/* Blinking editor cursor simulation */
+.editor-cursor {
+  border-left: 2px solid #1f6868; /* secondary */
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink {
+  50% { border-color: transparent; }
 }

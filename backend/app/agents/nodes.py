@@ -123,10 +123,37 @@ def load_prompt(filename: str) -> str:
     }
     return fallbacks.get(filename, "")
 
+def clean_json_response(content: str) -> str:
+    content = content.strip()
+    if content.startswith("```"):
+        lines = content.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        content = "\n".join(lines).strip()
+    first_brace = content.find("{")
+    last_brace = content.rfind("}")
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        content = content[first_brace:last_brace+1]
+    return content
+
 # Hindi Phonetic Matra Counting Algorithm
 class HindiSyllabifier:
     @staticmethod
     def count_word_matras(word: str) -> int:
+        import re
+        # Check if the word contains Latin characters (English/Hinglish)
+        if re.search(r'[a-zA-Z]', word):
+            word_lower = word.lower()
+            # Remove trailing silent e
+            if word_lower.endswith('e'):
+                word_lower = word_lower[:-1]
+            # Count vowel clusters
+            vowel_clusters = re.findall(r'[aeiouy]+', word_lower)
+            # Each syllable maps approximately to 2 matras (Ghalib/Ghazal metrics mapping)
+            return max(1, len(vowel_clusters)) * 2
+
         laghu_vowels = set("अइउऋ")
         laghu_signs = set("िुृँ")
         guru_vowels = set("आईऊएऐओऔ")
@@ -230,22 +257,41 @@ def fetch_node(state: PoetryStudioState, config: RunnableConfig = None) -> Dict[
         "poem_id": poem_id,
         "title": title,
         "original_text": cleaned_text,
+        "language": poem.language,
         "logs": state.get("logs", []) + [f"FetchAgent cleaned and imported: {title}"]
     }
 
 def translation_node(state: PoetryStudioState, config: RunnableConfig = None) -> Dict[str, Any]:
-    """Generates Hinglish and English versions."""
+    """Generates translations dynamically based on source language."""
     db = config["configurable"]["db"]
     poem_id = state["poem_id"]
     original_text = state["original_text"]
     
+    # Resolve source language
+    source_lang = state.get("language")
+    if not source_lang:
+        poem_repo = PoemRepository(db)
+        poem = poem_repo.get(poem_id)
+        source_lang = poem.language if poem else "Hindi"
+        
+    source_lang_lower = source_lang.lower()
+    
+    # Determine target languages dynamically
+    if "english" in source_lang_lower:
+        targets = ["Hindi", "Hinglish"]
+    elif "urdu" in source_lang_lower:
+        targets = ["Hindi", "Hinglish", "English"]
+    elif "hinglish" in source_lang_lower:
+        targets = ["Hindi", "English"]
+    else: # Default: Hindi
+        targets = ["English", "Hinglish", "Urdu"]
+        
     trans_repo = TranslationRepository(db)
     log_repo = LogRepository(db)
     llm = get_llm_model()
 
     translations = {}
-    # Translate to English and Hinglish
-    for lang in ["English", "Hinglish"]:
+    for lang in targets:
         prompt_template = load_prompt("translation.txt")
         if not prompt_template:
             # Fallback
@@ -310,7 +356,7 @@ def meter_node(state: PoetryStudioState, config: RunnableConfig = None) -> Dict[
             
             try:
                 response = llm.invoke(prompt)
-                suggestion_data = json.loads(response.content.strip())
+                suggestion_data = json.loads(clean_json_response(response.content))
                 suggestions.append({
                     "line_number": entry["line_number"],
                     "line_text": entry["line_text"],
@@ -370,7 +416,7 @@ def audience_romantic_node(state: PoetryStudioState, config: RunnableConfig = No
     review_data = {"rating": 5, "strengths": [], "weaknesses": [], "favorite_line": "", "confusing_line": "", "suggestion": "", "final_emotion": ""}
     try:
         res = llm.invoke(prompt)
-        review_data = json.loads(res.content.strip())
+        review_data = json.loads(clean_json_response(res.content))
     except Exception as e:
         logger.error(f"Romantic reviewer parsing error: {e}")
         
@@ -404,7 +450,7 @@ def audience_critic_node(state: PoetryStudioState, config: RunnableConfig = None
     review_data = {"rating": 5, "strengths": [], "weaknesses": [], "favorite_line": "", "confusing_line": "", "suggestion": "", "final_emotion": ""}
     try:
         res = llm.invoke(prompt)
-        review_data = json.loads(res.content.strip())
+        review_data = json.loads(clean_json_response(res.content))
     except Exception as e:
         logger.error(f"Critic reviewer parsing error: {e}")
         
@@ -438,7 +484,7 @@ def audience_instagrammer_node(state: PoetryStudioState, config: RunnableConfig 
     review_data = {"rating": 5, "strengths": [], "weaknesses": [], "favorite_line": "", "confusing_line": "", "suggestion": "", "final_emotion": ""}
     try:
         res = llm.invoke(prompt)
-        review_data = json.loads(res.content.strip())
+        review_data = json.loads(clean_json_response(res.content))
     except Exception as e:
         logger.error(f"Instagrammer reviewer parsing error: {e}")
         

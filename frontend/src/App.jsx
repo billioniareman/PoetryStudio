@@ -1,49 +1,73 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  BookOpen, 
-  Sparkles, 
-  Languages, 
-  Activity, 
-  Users, 
-  Image as ImageIcon, 
-  Share2, 
-  History, 
-  Database, 
-  ChevronRight, 
-  ArrowLeft, 
-  Plus, 
-  Check, 
-  RefreshCw, 
-  Clock, 
-  AlertCircle, 
-  Heart, 
-  BookOpenCheck, 
-  Instagram, 
-  Copy, 
-  Download, 
-  Send 
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 
 const API_BASE = "http://localhost:8000";
 
 // Standard sample poems for offline fallback
-const CLIENT_MOCK_POEMS = [];
-
+const CLIENT_MOCK_POEMS = [
+  {
+    id: 101,
+    title: "Ozymandias",
+    original_text: "I met a traveller from an antique land,\nWho said—“Two vast and trunkless legs of stone\nStand in the desert. . . . Near them, on the sand,\nHalf sunk a shattered visage lies, whose frown,\nAnd wrinkled lip, and sneer of cold command,\nTell that its sculptor well those passions read\nWhich yet survive, stamped on these lifeless things,\nThe hand that mocked them, and the heart that fed;\nAnd on the pedestal, these words appear:\nMy name is Ozymandias, King of Kings;\nLook on my Works, ye Mighty, and despair!\nNothing beside remains. Round the decay\nOf that colossal Wreck, boundless and bare\nThe lone and level sands stretch far away.",
+    author: "Percy Bysshe Shelley",
+    tags: "Classic,Philosophical",
+    category: "Sonnet",
+    is_draft: false,
+    is_published: true,
+    created_at: "2023-10-01T12:00:00Z",
+    updated_at: "2023-10-01T12:00:00Z"
+  },
+  {
+    id: 102,
+    title: "Autumn's Sigh",
+    original_text: "Leaves fall like whispered secrets,\nGolden hues upon the grey stone,\nA chill wind carries memories...",
+    author: "Percy Bysshe Shelley",
+    tags: "Nature,Melancholy",
+    category: "Free Verse",
+    is_draft: true,
+    is_published: false,
+    created_at: "2023-10-24T12:00:00Z",
+    updated_at: "2023-10-24T12:00:00Z"
+  },
+  {
+    id: 103,
+    title: "The Midnight Sea",
+    original_text: "Dark waters churning beneath a pale moon,\nStars reflected in the violent swell,\nA lonely lighthouse cuts the gloom...",
+    author: "Percy Bysshe Shelley",
+    tags: "Mysterious,Atmospheric",
+    category: "Sonnet",
+    is_draft: false,
+    is_published: true,
+    created_at: "2023-10-12T12:00:00Z",
+    updated_at: "2023-10-12T12:00:00Z"
+  },
+  {
+    id: 104,
+    title: "Echoes of Dawn",
+    original_text: "First light breaking through the pines,\nBirdsong answers the fading night,\nA new day written in golden lines...",
+    author: "Percy Bysshe Shelley",
+    tags: "Hope,Morning",
+    category: "Haiku",
+    is_draft: true,
+    is_published: false,
+    created_at: "2023-09-28T12:00:00Z",
+    updated_at: "2023-09-28T12:00:00Z"
+  }
+];
 
 export default function App() {
   // Navigation & Core State
-  const [activeTab, setActiveTab] = useState("dashboard"); // dashboard, poems, publish, logs
+  const [activeTab, setActiveTab] = useState("dashboard"); // dashboard, kaagaz, kitabghar, review
   const [isBackendOnline, setIsBackendOnline] = useState(false);
-  const [poems, setPoems] = useState([]);
-  const [selectedPoemId, setSelectedPoemId] = useState(null);
+  const [poems, setPoems] = useState(CLIENT_MOCK_POEMS);
+  const [selectedPoemId, setSelectedPoemId] = useState(101);
+  const [focusMode, setFocusMode] = useState(false);
   
   // Active selected poem details
   const [poemDetails, setPoemDetails] = useState(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [editingText, setEditingText] = useState("");
-  const [activeDetailTab, setActiveDetailTab] = useState("editor"); // editor, translations, meter, reviews, design, publish, history
   
-  // Pipeline Loading Status
+  // Pipeline Loading Status for Keep Import
   const [importing, setImporting] = useState(false);
   const [pipelineStep, setPipelineStep] = useState(null); // fetch, translation, meter, audience, design, publish, done
   const [logs, setLogs] = useState([]);
@@ -52,16 +76,130 @@ export default function App() {
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
-  // Auto-save feedback message
+  // Auto-save & AI status feedback messages
   const [saveStatus, setSaveStatus] = useState("Saved");
-
-  // Pillow template selection
-  const [activeTemplate, setActiveTemplate] = useState("Dark");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Check backend server health on mount
   useEffect(() => {
     checkBackendHealth();
   }, []);
+
+  // Update focus-mode class on body
+  useEffect(() => {
+    if (focusMode) {
+      document.body.classList.add('focus-mode');
+    } else {
+      document.body.classList.remove('focus-mode');
+    }
+  }, [focusMode]);
+
+  // Debounced auto-save and live translation effect
+  useEffect(() => {
+    if (!editingText && !editingTitle) return;
+    setSaveStatus("Typing...");
+
+    const delayDebounceFn = setTimeout(async () => {
+      // 1. Save changes to server/local state
+      const savedId = await savePoemToServer(editingText, editingTitle);
+      const activeId = savedId || selectedPoemId;
+      if (!activeId) return;
+
+      // 2. Perform live translation update
+      if (isBackendOnline) {
+        try {
+          const res = await fetch(`${API_BASE}/poems/${activeId}/translate`, { 
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ original_text: editingText })
+          });
+          if (res.ok) {
+            const transData = await res.json();
+            setPoemDetails(prev => {
+              const updatedTranslations = prev ? [...prev.translations] : [];
+              const hasHindi = updatedTranslations.some(t => t.language.includes("Hindi"));
+              
+              let newTrans;
+              if (hasHindi) {
+                newTrans = updatedTranslations.map(t => 
+                  t.language.includes("Hindi") ? { ...t, content: transData.translation } : t
+                );
+              } else {
+                newTrans = [
+                  ...updatedTranslations,
+                  { id: Date.now(), language: "Hindi", content: transData.translation }
+                ];
+              }
+              
+              return prev ? {
+                ...prev,
+                translations: newTrans
+              } : {
+                poem: { id: activeId, title: editingTitle, original_text: editingText, category: "Free Verse" },
+                translations: newTrans,
+                versions: [],
+                meter_analysis: { bahr_chhand: "Baseline", rhyming_consistency: "Consistent", suggestions_json: [], matra_counts_json: [] },
+                audience_reviews: [],
+                generated_media: [],
+                events: []
+              };
+            });
+          }
+        } catch (e) {
+          console.error("Live translation error", e);
+        }
+      } else {
+        // Offline translation simulation using dynamic rules
+        setPoemDetails(prev => {
+          const updatedTranslations = prev ? [...prev.translations] : [];
+          const hasHindi = updatedTranslations.some(t => t.language.includes("Hindi"));
+          
+          const translatedMockContent = "Simulated Live Hindi Translation:\n" + 
+            editingText.split('\n').map(line => {
+              let l = line.toLowerCase();
+              l = l.replace(/\bhello\b/g, "नमस्ते")
+                   .replace(/\bwater\b/g, "पानी")
+                   .replace(/\brain\b/g, "बरसात")
+                   .replace(/\bpain\b/g, "दर्द")
+                   .replace(/\bwhisper\b/g, "फुसफुसाहट")
+                   .replace(/\bsigh\b/g, "आह")
+                   .replace(/\bsea\b/g, "समुद्र")
+                   .replace(/\bmoon\b/g, "चाँद")
+                   .replace(/\bstar\b/g, "तारा")
+                   .replace(/\bsolace\b/g, "सुकून");
+              return l;
+            }).join('\n');
+
+          let newTrans;
+          if (hasHindi) {
+            newTrans = updatedTranslations.map(t => 
+              t.language.includes("Hindi") ? { ...t, content: translatedMockContent } : t
+            );
+          } else {
+            newTrans = [
+              ...updatedTranslations,
+              { id: Date.now(), language: "Hindi", content: translatedMockContent }
+            ];
+          }
+
+          return prev ? {
+            ...prev,
+            translations: newTrans
+          } : {
+            poem: { id: activeId, title: editingTitle, original_text: editingText, category: "Free Verse" },
+            translations: newTrans,
+            versions: [],
+            meter_analysis: { bahr_chhand: "Baseline", rhyming_consistency: "Consistent", suggestions_json: [], matra_counts_json: [] },
+            audience_reviews: [],
+            generated_media: [],
+            events: []
+          };
+        });
+      }
+    }, 1200);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [editingText, editingTitle]);
 
   const checkBackendHealth = async () => {
     try {
@@ -80,8 +218,15 @@ export default function App() {
   const loadMockState = () => {
     setIsBackendOnline(false);
     setPoems(CLIENT_MOCK_POEMS);
+    if (CLIENT_MOCK_POEMS.length > 0) {
+      const defaultPoem = CLIENT_MOCK_POEMS[0];
+      setSelectedPoemId(defaultPoem.id);
+      setEditingTitle(defaultPoem.title);
+      setEditingText(defaultPoem.original_text);
+      setPoemDetails(generateLocalMockDetails(defaultPoem));
+    }
     setLogs([
-      { id: 1, poem_id: null, event_name: "system.offline", payload_json: { msg: "API Offline. Running in simulated Client Mode." }, emitted_at: new Date().toISOString() }
+      { id: 1, event_name: "system.offline", payload_json: { msg: "API Offline. Running in simulated Client Mode." }, emitted_at: new Date().toISOString() }
     ]);
   };
 
@@ -92,8 +237,11 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setPoems(data);
-        if (selectFirst && data.length > 0) {
-          selectPoem(data[0].id);
+        if (data.length > 0) {
+          const firstId = data[0].id;
+          if (selectFirst || !selectedPoemId) {
+            selectPoem(firstId, data);
+          }
         }
       }
     } catch (e) {
@@ -102,19 +250,21 @@ export default function App() {
   };
 
   // Select a poem and fetch full analysis details
-  const selectPoem = async (poemId) => {
+  const selectPoem = async (poemId, poemList = poems) => {
+    if (!poemId) return;
     setSelectedPoemId(poemId);
-    setActiveDetailTab("editor");
     setSuggestions([]);
     
+    const poem = poemList.find(p => p.id === poemId);
+    if (poem) {
+      setEditingTitle(poem.title || "");
+      setEditingText(poem.original_text || "");
+    }
+
     if (!isBackendOnline) {
-      // Load local mock details
-      const poem = poems.find(p => p.id === poemId) || CLIENT_MOCK_POEMS[0];
-      setEditingTitle(poem.title);
-      setEditingText(poem.original_text);
-      
-      // Compute local mockup reviews, translations, meter counts
-      setPoemDetails(generateLocalMockDetails(poem));
+      if (poem) {
+        setPoemDetails(generateLocalMockDetails(poem));
+      }
       return;
     }
 
@@ -123,8 +273,8 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setPoemDetails(data);
-        setEditingTitle(data.poem.title);
-        setEditingText(data.poem.original_text);
+        setEditingTitle(data?.poem?.title || "");
+        setEditingText(data?.poem?.original_text || "");
       }
     } catch (e) {
       console.error("Fetch poem details failed", e);
@@ -133,13 +283,47 @@ export default function App() {
 
   // Generates offline mock statistics for display
   const generateLocalMockDetails = (poem) => {
-    // Basic matra counts for lines
+    if (!poem || !poem.original_text) return null;
     const lines = poem.original_text.split('\n').filter(l => l.trim());
-    const matras = lines.map((l, i) => ({
-      line_number: i + 1,
-      line_text: l,
-      matra_count: Math.round(18 + Math.random() * 8)
-    }));
+    
+    const countSyllables = (word) => {
+      // Latin script syllable counting approximation
+      if (/[a-zA-Z]/.test(word)) {
+        let w = word.toLowerCase();
+        if (w.endsWith('e')) w = w.slice(0, -1);
+        const vowelClusters = w.match(/[aeiouy]+/g);
+        return (vowelClusters ? vowelClusters.length : 1) * 2;
+      }
+      
+      // Devanagari matra counting approximation
+      let matras = 0;
+      for (let i = 0; i < word.length; i++) {
+        const c = word[i];
+        if (/[आईऊएऐओऔाीूेैोौंः]/.test(c)) {
+          matras += 2;
+        } else if (c === '्') {
+          matras = Math.max(0, matras - 1);
+        } else if (/[अइउऋ]/.test(c) || (c >= '\u0905' && c <= '\u0939')) {
+          matras += 1;
+        }
+      }
+      return Math.max(1, matras);
+    };
+
+    const matras = lines.map((l, i) => {
+      const words = l.trim().split(/\s+/).filter(Boolean);
+      const totalMatras = words.reduce((sum, w) => sum + countSyllables(w), 0);
+      return {
+        line_number: i + 1,
+        line_text: l,
+        matra_count: totalMatras
+      };
+    });
+
+    const secondLine = lines[1] || "";
+    const secondLineWords = secondLine.split(/\s+/).filter(Boolean);
+    const suggestionWord = secondLineWords[secondLineWords.length - 1] || "rain";
+    const replacementWord = suggestionWord === "rain" ? "pain" : "solace";
 
     return {
       poem,
@@ -147,29 +331,28 @@ export default function App() {
         { id: 1, version_number: 1, created_by: "FetchAgent", content: poem.original_text, diff_summary: "Initial clean import", created_at: poem.created_at }
       ],
       translations: [
-        { id: 1, language: "English", content: "Softly whispers the evening breeze,\nCarrying secrets through the trees.\nIn your silence, I find my peace,\nMay this beautiful night never cease." },
-        { id: 2, language: "Hinglish", content: "Dheere se chalti hai shaam ki hawa,\nPedon ke beech chupaye koi raaz.\nTeri khamoshi mein milta hai sukoon,\nKaash ye haseen raat kabhi khatam na ho." }
+        { id: 1, language: "English", content: "Translation of '" + poem.title + "' into English:\n" + lines.map(l => "Eng: " + l).join('\n') },
+        { id: 2, language: "Hindi/Translation", content: "Hindi translation of '" + poem.title + "':\n" + lines.map(l => "हिंदी: " + l).join('\n') }
       ],
       meter_analysis: {
         bahr_chhand: "Baseline Matra: " + (matras[0]?.matra_count || 24),
         rhyming_consistency: "Consistent",
-        suggestions_json: [
+        suggestions_json: secondLine ? [
           {
             line_number: 2,
-            line_text: lines[1] || "",
-            current_matra: matras[1]?.matra_count || 26,
+            line_text: secondLine,
+            current_matra: matras[1]?.matra_count || 24,
             target_matra: matras[0]?.matra_count || 24,
-            reason: "Word count exceeds normal meter structure",
-            recommendations: [{ replace: "मुस्कुराहट", with: "हँसी", reason: "Saves matras" }]
+            reason: `Meter variation found at the end of the line.`,
+            recommendations: [{ replace: suggestionWord, with: replacementWord, reason: "Aligns matras count" }]
           }
-        ],
+        ] : [],
         matra_counts_json: matras
       },
       audience_reviews: [
-        { id: 1, persona_name: "Romantic Lover", rating: 9, strengths_json: ["Emotionally vulnerable", "Beautiful word choices"], weaknesses_json: ["Rhythm slows in line 2"], favorite_line: lines[0], confusing_line: null, suggestion: "Focus on deepening the imagery of silence", final_emotion: "Yearning (Ishq)" },
-        { id: 2, persona_name: "Literary Critic", rating: 8, strengths_json: ["Classical format", "Avoids clichés"], weaknesses_json: ["Conventional metaphors"], favorite_line: lines[2], confusing_line: lines[1], suggestion: "Substitute common metaphors with local imagery", final_emotion: "Appreciation" },
-        { id: 3, persona_name: "Instagram Reader", rating: 9, strengths_json: ["Extremely shareable couplets", "Captivating aesthetic"], weaknesses_json: ["A bit dense for rapid scrolling"], favorite_line: lines[0], confusing_line: null, suggestion: "Start with the main punchline directly", final_emotion: "Aesthetic Vibe" },
-        { id: 4, persona_name: "Aggregator", rating: 9, strengths_json: ["Relatable", "Deep", "Structured"], weaknesses_json: ["Slight rhythm deviation"], favorite_line: lines[0], confusing_line: null, suggestion: "Apply the suggested word substitutions", final_emotion: "Romantic Melancholy" }
+        { id: 1, persona_name: "Romantic Lover", rating: 9, strengths_json: ["Emotionally vulnerable", "Beautiful word choices"], weaknesses_json: ["Rhythm slows in line 2"], favorite_line: lines[0] || "No text", confusing_line: null, suggestion: "Focus on deepening the imagery in: '" + (lines[0] || "") + "'", final_emotion: "Yearning (Ishq)" },
+        { id: 2, persona_name: "Literary Critic", rating: 8, strengths_json: ["Classical format", "Avoids clichés"], weaknesses_json: ["Conventional metaphors"], favorite_line: lines[0] || "No text", confusing_line: lines[1] || null, suggestion: "Refine word choices in '" + (lines[1] || "") + "' to raise depth.", final_emotion: "Appreciation" },
+        { id: 3, persona_name: "Instagram Reader", rating: 9, strengths_json: ["Extremely shareable couplets", "Captivating aesthetic"], weaknesses_json: ["A bit dense for rapid scrolling"], favorite_line: lines[0] || "No text", confusing_line: null, suggestion: "Share the main couplet: '" + (lines[0] || "") + "' directly.", final_emotion: "Aesthetic Vibe" }
       ],
       generated_media: [
         { id: 1, template_name: "Dark", media_url: "placeholder_dark.png" },
@@ -183,39 +366,33 @@ export default function App() {
     };
   };
 
-  // Simulated live execution loader for LangGraph Node flow
+  // Simulated live execution loader for Google Keep Import
   const triggerGoogleKeepImport = async () => {
     setImporting(true);
     setPipelineStep("fetch");
     setLogs(prev => [{ id: Date.now(), event_name: "pipeline.started", payload_json: { msg: "Importing notes from Google Keep..." }, emitted_at: new Date().toISOString() }, ...prev]);
 
-    // Stage 1: Fetch Note (2s)
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 1000));
     setPipelineStep("translation");
     setLogs(prev => [{ id: Date.now(), event_name: "poem.imported", payload_json: { msg: "FetchAgent: Normalized text & extracted title." }, emitted_at: new Date().toISOString() }, ...prev]);
 
-    // Stage 2: Translate (2s)
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 1000));
     setPipelineStep("meter");
     setLogs(prev => [{ id: Date.now(), event_name: "translation.completed", payload_json: { msg: "TranslationAgent: Hinglish & English versions saved." }, emitted_at: new Date().toISOString() }, ...prev]);
 
-    // Stage 3: Meter count (2s)
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 1000));
     setPipelineStep("audience");
     setLogs(prev => [{ id: Date.now(), event_name: "meter.completed", payload_json: { msg: "MeterAgent: Syllable count matched to base matra." }, emitted_at: new Date().toISOString() }, ...prev]);
 
-    // Stage 4: Reviews (2s)
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 1000));
     setPipelineStep("design");
     setLogs(prev => [{ id: Date.now(), event_name: "audience.reviewed", payload_json: { msg: "AudienceReviewers: Merged Romantic/Critic reviews." }, emitted_at: new Date().toISOString() }, ...prev]);
 
-    // Stage 5: Pillow draw (2s)
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 1000));
     setPipelineStep("publish");
     setLogs(prev => [{ id: Date.now(), event_name: "design.completed", payload_json: { msg: "DesignAgent: Generated themed social visual cards." }, emitted_at: new Date().toISOString() }, ...prev]);
 
-    // Stage 6: Publish Stage (1.5s)
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 800));
     setPipelineStep("done");
     
     if (isBackendOnline) {
@@ -225,33 +402,30 @@ export default function App() {
           const newPoems = await res.json();
           await fetchPoems();
           if (newPoems.length > 0) {
-            selectPoem(newPoems[newPoems.length - 1].id);
+            selectPoem(newPoems[newPoems.length - 1].id, newPoems);
           }
         }
       } catch (e) {
         console.error("Keep backend fetch failed", e);
       }
     } else {
-      // Offline Simulation: Add the mock Faiz poem if not already present
-      if (poems.length === 3) {
+      // Offline Simulation: Add the mock Faiz poem
+      if (poems.length < 5) {
         const imported = {
-          id: 104,
+          id: 105,
           title: "नक्श-ए-फ़रियादी",
           original_text: "मुझसे पहली सी मोहब्बत मेरे महबूब न माँग,\nमैंने समझा था कि तू है तो दरख़्शाँ है हयात।\nतेरा ग़म है तो ग़म-ए-दहर का झगड़ा क्या है,\nतेरी सूरत से है आलम में बहारों को सबात।",
-          language: "Urdu",
-          source: "google_keep",
-          google_keep_id: "keep_poem_4",
+          author: "Faiz Ahmed Faiz",
           tags: "Faiz,Nostalgia",
           category: "Nazm",
           is_draft: true,
           is_published: false,
-          is_archived: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
         const updatedPoems = [...poems, imported];
         setPoems(updatedPoems);
-        setSelectedPoemId(104);
+        setSelectedPoemId(105);
         setEditingTitle(imported.title);
         setEditingText(imported.original_text);
         setPoemDetails(generateLocalMockDetails(imported));
@@ -264,73 +438,131 @@ export default function App() {
 
   // Run full LangGraph pipeline re-analysis
   const runPipelineReanalysis = async () => {
+    if (!selectedPoemId) return;
+    setIsAnalyzing(true);
+    setSaveStatus("Analyzing...");
+    
     if (!isBackendOnline) {
-      alert("Simulating pipeline run. Local reports re-calculated.");
-      selectPoem(selectedPoemId);
+      await new Promise(r => setTimeout(r, 1200));
+      const poem = poems.find(p => p.id === selectedPoemId);
+      if (poem) {
+        setPoemDetails(generateLocalMockDetails(poem));
+      }
+      setSaveStatus("Saved & Analyzed");
+      setIsAnalyzing(false);
+      setActiveTab("review");
       return;
     }
     
-    setSaveStatus("Analyzing...");
     try {
       const res = await fetch(`${API_BASE}/poems/${selectedPoemId}/reanalyze`, { method: "POST" });
       if (res.ok) {
         const data = await res.json();
         setPoemDetails(data);
-        setSaveStatus("Analyzed & Saved");
-        setTimeout(() => setSaveStatus("Saved"), 3000);
+        setSaveStatus("Saved & Analyzed");
+        setActiveTab("review");
       }
     } catch (e) {
       console.error(e);
       setSaveStatus("Failed");
     }
+    setIsAnalyzing(false);
   };
 
-  // Handles text editor updates and sends PUT requests to backend
+  // Handles fast local updates on typing
   const handleEditorUpdate = async (newText, newTitle = editingTitle) => {
     setEditingText(newText);
     setEditingTitle(newTitle);
-    setSaveStatus("Saving...");
+    setSaveStatus("Typing...");
+  };
+
+  // Save/Create poem backend call
+  const savePoemToServer = async (text, title) => {
+    if (!text && !title) return null;
+
+    if (!selectedPoemId) {
+      // Create new poem record
+      if (!isBackendOnline) {
+        const newPoem = {
+          id: Date.now(),
+          title: title || "Untitled Poem",
+          original_text: text,
+          author: "user",
+          tags: "Draft",
+          category: "Free Verse",
+          is_draft: true,
+          is_published: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setPoems(prev => [newPoem, ...prev]);
+        setSelectedPoemId(newPoem.id);
+        setPoemDetails(generateLocalMockDetails(newPoem));
+        setSaveStatus("Saved");
+        return newPoem.id;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/poems`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: title || "Untitled", original_text: text, language: "Hindi", source: "manual" })
+        });
+        if (res.ok) {
+          const created = await res.json();
+          setPoems(prev => [created, ...prev]);
+          setSelectedPoemId(created.id);
+          const detailRes = await fetch(`${API_BASE}/poems/${created.id}`);
+          if (detailRes.ok) {
+            const detailData = await detailRes.json();
+            setPoemDetails(detailData);
+          }
+          setSaveStatus("Saved");
+          return created.id;
+        }
+      } catch (e) {
+        console.error("Failed to create poem", e);
+      }
+      return null;
+    }
+
+    // Save existing poem
+    setPoems(prev => prev.map(p => p.id === selectedPoemId ? { ...p, original_text: text, title: title } : p));
 
     if (!isBackendOnline) {
-      // Local mockup update
-      setPoems(prev => prev.map(p => p.id === selectedPoemId ? { ...p, original_text: newText, title: newTitle } : p));
+      const poem = poems.find(p => p.id === selectedPoemId);
+      if (poem) {
+        setPoemDetails(generateLocalMockDetails({ ...poem, original_text: text, title: title }));
+      }
       setSaveStatus("Saved");
-      return;
+      return selectedPoemId;
     }
 
     try {
       const res = await fetch(`${API_BASE}/poems/${selectedPoemId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ original_text: newText, title: newTitle })
+        body: JSON.stringify({ original_text: text, title: title })
       });
       if (res.ok) {
-        const data = await res.json();
         setSaveStatus("Saved");
-        // Reload details (which includes new versions list)
-        const detailRes = await fetch(`${API_BASE}/poems/${selectedPoemId}`);
-        if (detailRes.ok) {
-          const detailData = await detailRes.json();
-          setPoemDetails(detailData);
-        }
       }
     } catch (e) {
       console.error("Auto save failed", e);
       setSaveStatus("Offline/Failed");
     }
+    return selectedPoemId;
   };
 
   // Apply suggestions from MeterAgent
   const applyMeterSuggestion = async (originalLine, replacement) => {
     const newText = editingText.replace(originalLine, replacement);
     setEditingText(newText);
-    await handleEditorUpdate(newText);
+    await savePoemToServer(newText, editingTitle);
     
-    // Update local state details or trigger backend re-analysis
     if (isBackendOnline) {
       await runPipelineReanalysis();
     } else {
-      // Local replacement simulation
       setPoemDetails(prev => {
         const newMatras = prev.meter_analysis.matra_counts_json.map(m => 
           m.line_text === originalLine ? { ...m, line_text: replacement, matra_count: m.matra_count - 2 } : m
@@ -343,7 +575,6 @@ export default function App() {
           ],
           meter_analysis: {
             ...prev.meter_analysis,
-            rhyming_consistency: "Consistent",
             suggestions_json: [],
             matra_counts_json: newMatras
           }
@@ -352,18 +583,18 @@ export default function App() {
     }
   };
 
-  // Get voice-preserving editing improvements
+  // Fetch voice-preserving editing improvements
   const fetchEditorImprovements = async () => {
     setLoadingSuggestions(true);
     if (!isBackendOnline) {
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 600));
       setSuggestions([
         {
-          original_line: poemDetails?.meter_analysis?.suggestions_json[0]?.line_text || "मुस्कुराहट तेरी सब कुछ बदल देती है",
-          suggested_line: "हँसी तेरी सब कुछ बदल देती है",
-          change_summary: "Replaced 'मुस्कुराहट' with 'हँसी'",
-          reason: "Preserves the emotional flow while matching the strict 24-matra Ghazal meter count.",
-          emotional_impact: "Increases structural punchiness."
+          original_line: poemDetails?.meter_analysis?.suggestions_json[0]?.line_text || "A thousand whispers spoken all in vain.",
+          suggested_line: "A thousand whispers spoken in our pain.",
+          change_summary: "Replaced 'all in vain' with 'in our pain'",
+          reason: "Preserves emotional cadence.",
+          emotional_impact: "Rhythmic balance."
         }
       ]);
       setLoadingSuggestions(false);
@@ -382,840 +613,577 @@ export default function App() {
     setLoadingSuggestions(false);
   };
 
-  // Approve publishing staged posts
-  const approveAndPublishStaged = async (postId) => {
+  // Publish staged posts
+  const approveAndPublishStaged = async () => {
     if (!isBackendOnline) {
-      // Mock approval
-      setPoemDetails(prev => ({
-        ...prev,
-        events: [
-          { id: Date.now(), event_name: "publish.completed", payload_json: { platform: "Instagram" }, emitted_at: new Date().toISOString() },
-          ...prev.events
-        ]
-      }));
-      alert("Simulating API Publication: Staged post successfully published to Instagram, Threads & LinkedIn!");
+      setPoems(prev => prev.map(p => p.id === selectedPoemId ? { ...p, is_published: true, is_draft: false } : p));
+      alert("Publication approved! Shared successfully to Instagram, Threads & LinkedIn.");
       return;
     }
 
     try {
-      const res = await fetch(`${API_BASE}/publish/${postId}/approve`, { method: "POST" });
+      const res = await fetch(`${API_BASE}/poems/${selectedPoemId}/publish`, { method: "POST" });
       if (res.ok) {
         alert("Publication approved! Shared successfully.");
-        // Reload detail events
+        fetchPoems();
         selectPoem(selectedPoemId);
       }
     } catch (e) {
       console.error(e);
+      alert("Publish failed.");
     }
   };
 
-  // Main UI render
+  // Helper: word count calculation
+  const getWordCount = (text) => {
+    if (!text) return 0;
+    return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  };
+
   return (
-    <div className="flex min-h-screen bg-poetry-bg text-poetry-text font-sans">
+    <div className="bg-background text-on-background font-body-md text-body-md antialiased min-h-screen flex flex-col selection:bg-tertiary-fixed selection:text-on-tertiary-fixed">
       
-      {/* Sidebar Navigation */}
-      <aside className="w-64 glass border-r border-poetry-border flex flex-col justify-between">
-        <div>
-          {/* Brand Header */}
-          <div className="p-6 border-b border-poetry-border flex items-center gap-3">
-            <div className="bg-poetry-accent/20 p-2 rounded-lg border border-poetry-accent/40">
-              <BookOpen className="w-6 h-6 text-poetry-accent" />
-            </div>
-            <div>
-              <h1 className="font-bold text-lg tracking-wide bg-gradient-to-r from-poetry-text to-poetry-accent bg-clip-text text-transparent">Poetry Studio</h1>
-              <span className="text-xs text-poetry-accent font-semibold tracking-widest uppercase">MVP v1.0</span>
-            </div>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="p-4 space-y-2 flex-1">
-            <button 
-              onClick={() => { setActiveTab("dashboard"); setSelectedPoemId(null); }}
-              className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === "dashboard" ? "bg-poetry-accent/15 text-poetry-accent font-semibold border border-poetry-accent/30" : "text-poetry-muted hover:text-poetry-text hover:bg-white/5"}`}
-            >
-              <Database className="w-5 h-5" />
-              Dashboard
-            </button>
-            <button 
-              onClick={() => { setActiveTab("poems"); if (poems.length > 0 && !selectedPoemId) selectPoem(poems[0].id); }}
-              className={`w-full text-left p-3 rounded-lg flex items-center justify-between transition-all ${activeTab === "poems" ? "bg-poetry-accent/15 text-poetry-accent font-semibold border border-poetry-accent/30" : "text-poetry-muted hover:text-poetry-text hover:bg-white/5"}`}
-            >
-              <span className="flex items-center gap-3">
-                <Sparkles className="w-5 h-5" />
-                AI Writing Room
-              </span>
-              {poems.length > 0 && <span className="bg-poetry-accent/20 text-poetry-accent text-xs px-2 py-0.5 rounded-full border border-poetry-accent/30">{poems.length}</span>}
-            </button>
-            <button 
-              onClick={() => setActiveTab("publish")}
-              className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === "publish" ? "bg-poetry-accent/15 text-poetry-accent font-semibold border border-poetry-accent/30" : "text-poetry-muted hover:text-poetry-text hover:bg-white/5"}`}
-            >
-              <Share2 className="w-5 h-5" />
-              Staging Scheduler
-            </button>
-            <button 
-              onClick={() => setActiveTab("logs")}
-              className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === "logs" ? "bg-poetry-accent/15 text-poetry-accent font-semibold border border-poetry-accent/30" : "text-poetry-muted hover:text-poetry-text hover:bg-white/5"}`}
-            >
-              <History className="w-5 h-5" />
-              Event Audit Trail
-            </button>
-          </nav>
-        </div>
-
-        {/* Server Status Indicators */}
-        <div className="p-4 border-t border-poetry-border">
-          <div className="glass-dark p-3 rounded-lg flex items-center justify-between">
-            <span className="text-xs text-poetry-muted font-medium">Server Connection</span>
-            <div className="flex items-center gap-1.5">
-              <span className={`w-2.5 h-2.5 rounded-full ${isBackendOnline ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50' : 'bg-amber-500 shadow-lg shadow-amber-500/50'}`} />
-              <span className="text-xs font-semibold">{isBackendOnline ? 'API Connected' : 'Simulated (Offline)'}</span>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Workspace Frame */}
-      <main className="flex-1 flex flex-col min-h-screen overflow-y-auto">
-        
-        {/* Top bar with quick triggers */}
-        <header className="h-20 border-b border-poetry-border px-8 flex items-center justify-between glass">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold tracking-tight text-white capitalize">{activeTab}</h2>
-            {importing && (
-              <span className="bg-poetry-accent/25 border border-poetry-accent/40 text-poetry-accent text-xs px-3 py-1 rounded-full flex items-center gap-2 font-medium">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                LangGraph: Processing {pipelineStep} Node...
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={triggerGoogleKeepImport}
-              disabled={importing}
-              className="bg-gradient-to-r from-poetry-accent to-poetry-gold text-poetry-bg hover:opacity-90 active:scale-95 disabled:opacity-50 px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg shadow-poetry-accent/20 transition-all"
-            >
-              <RefreshCw className={`w-4 h-4 ${importing ? 'animate-spin' : ''}`} />
-              Import Google Keep Notes
-            </button>
-          </div>
-        </header>
-
-        {/* Dynamic Panels */}
-        <div className="flex-1 p-8">
-          
-          {/* TAB 1: DASHBOARD VIEW */}
-          {activeTab === "dashboard" && !selectedPoemId && (
-            <div className="space-y-8">
-              {/* Hero Banner */}
-              <div className="bg-gradient-to-br from-poetry-card to-poetry-darker p-8 rounded-2xl border border-poetry-border/40 relative overflow-hidden">
-                <div className="absolute right-0 top-0 w-96 h-96 bg-poetry-accent/5 rounded-full filter blur-3xl" />
-                <div className="relative z-10 max-w-2xl space-y-4">
-                  <span className="text-poetry-accent font-bold tracking-widest text-xs uppercase">Welcome Writer</span>
-                  <h3 className="text-3xl font-bold text-white font-serif italic">"लेखनी जहाँ दिल की धड़कन बन जाए।"</h3>
-                  <p className="text-poetry-muted text-sm leading-relaxed">
-                    Poetry Studio integrates advanced AI models configured as specialized agents (Translators, Meter critics, Social card generators) to help you compose, analyze, refine, and publish poetry in Hindi, Hinglish, and Urdu.
-                  </p>
-                  <div className="pt-2 flex gap-4">
-                    <button 
-                      onClick={triggerGoogleKeepImport}
-                      className="bg-poetry-accent/20 border border-poetry-accent/40 text-poetry-accent hover:bg-poetry-accent/30 text-sm font-semibold px-5 py-2 rounded-lg transition-all"
-                    >
-                      Sync Poetry Feed
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Statistics Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="glass p-6 rounded-xl space-y-2">
-                  <span className="text-poetry-muted text-xs font-semibold tracking-wider uppercase block">Total Poems</span>
-                  <div className="flex items-center justify-between">
-                    <span className="text-3xl font-extrabold text-white">{poems.length}</span>
-                    <Sparkles className="w-8 h-8 text-poetry-accent/40" />
-                  </div>
-                </div>
-                <div className="glass p-6 rounded-xl space-y-2">
-                  <span className="text-poetry-muted text-xs font-semibold tracking-wider uppercase block">Translations Stored</span>
-                  <div className="flex items-center justify-between">
-                    <span className="text-3xl font-extrabold text-white">{poems.length * 2}</span>
-                    <Languages className="w-8 h-8 text-poetry-accent/40" />
-                  </div>
-                </div>
-                <div className="glass p-6 rounded-xl space-y-2">
-                  <span className="text-poetry-muted text-xs font-semibold tracking-wider uppercase block">Critic Score</span>
-                  <div className="flex items-center justify-between">
-                    <span className="text-3xl font-extrabold text-white">8.7 <span className="text-sm text-poetry-muted">/ 10</span></span>
-                    <Users className="w-8 h-8 text-poetry-accent/40" />
-                  </div>
-                </div>
-                <div className="glass p-6 rounded-xl space-y-2">
-                  <span className="text-poetry-muted text-xs font-semibold tracking-wider uppercase block">Staged Posts</span>
-                  <div className="flex items-center justify-between">
-                    <span className="text-3xl font-extrabold text-white">1</span>
-                    <Share2 className="w-8 h-8 text-poetry-accent/40" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Poems */}
-              <div className="space-y-4">
-                <h4 className="text-lg font-bold text-white tracking-wide">Recent Composition Feed</h4>
-                <div className="glass rounded-xl overflow-hidden border border-poetry-border/40">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-poetry-darker/60 border-b border-poetry-border/30 text-poetry-muted font-semibold">
-                      <tr>
-                        <th className="p-4">Title</th>
-                        <th className="p-4">Language</th>
-                        <th className="p-4">Source</th>
-                        <th className="p-4">Tags</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-poetry-border/20">
-                      {poems.map(poem => (
-                        <tr key={poem.id} className="hover:bg-white/5 transition-all">
-                          <td className="p-4 font-semibold text-white font-serif">{poem.title}</td>
-                          <td className="p-4">{poem.language}</td>
-                          <td className="p-4">
-                            <span className="bg-white/5 border border-white/10 text-xs px-2 py-0.5 rounded text-poetry-muted capitalize">
-                              {poem.source.replace('_', ' ')}
-                            </span>
-                          </td>
-                          <td className="p-4 text-poetry-muted text-xs">{poem.tags || 'General'}</td>
-                          <td className="p-4">
-                            <span className="bg-poetry-accent/10 border border-poetry-accent/25 text-poetry-accent text-xs px-2.5 py-0.5 rounded-full font-medium">
-                              Draft
-                            </span>
-                          </td>
-                          <td className="p-4 text-right">
-                            <button 
-                              onClick={() => { setActiveTab("poems"); selectPoem(poem.id); }}
-                              className="text-poetry-accent hover:text-poetry-gold font-semibold flex items-center gap-1 ml-auto"
-                            >
-                              Open Editor
-                              <ChevronRight className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+      {/* Top Navigation Shell */}
+      <nav className="bg-background fixed top-0 w-full z-50 flex justify-between items-center px-container-padding-desktop max-w-7xl mx-auto border-b border-outline-variant h-20 top-nav-transition sidebar-transition">
+        <div className="flex items-center gap-base">
+          <span 
+            className="font-headline-lg text-headline-lg font-bold text-primary cursor-pointer"
+            onClick={() => setActiveTab("dashboard")}
+          >
+            PoetryStudio
+          </span>
+          {isBackendOnline ? (
+            <span className="text-[11px] bg-green-100 text-green-800 px-2 py-0.5 rounded-full flex items-center gap-1 font-label-caps">
+              <span className="w-1.5 h-1.5 bg-green-600 rounded-full animate-pulse"></span>
+              Online
+            </span>
+          ) : (
+            <span className="text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full flex items-center gap-1 font-label-caps">
+              <span className="w-1.5 h-1.5 bg-amber-600 rounded-full"></span>
+              Simulated
+            </span>
           )}
+        </div>
+        
+        <div className="hidden md:flex items-center gap-gutter">
+          {/* Navigation Links */}
+          <button 
+            className={`font-label-caps text-label-caps pb-1 transition-all duration-200 ${
+              activeTab === "kaagaz" 
+                ? "text-primary border-b-2 border-primary" 
+                : "text-on-surface-variant hover:text-primary hover:opacity-80"
+            }`}
+            onClick={() => { 
+              setActiveTab("kaagaz"); 
+              setFocusMode(false); 
+              // Clicking Kaagaz from navigation header opens a blank canvas!
+              setSelectedPoemId(null);
+              setEditingTitle("");
+              setEditingText("");
+              setPoemDetails(null);
+            }}
+          >
+            Kaagaz
+          </button>
+          <button 
+            className={`font-label-caps text-label-caps pb-1 transition-all duration-200 ${
+              activeTab === "dashboard" 
+                ? "text-primary border-b-2 border-primary" 
+                : "text-on-surface-variant hover:text-primary hover:opacity-80"
+            }`}
+            onClick={() => { setActiveTab("dashboard"); setFocusMode(false); }}
+          >
+            Dashboard
+          </button>
+          <button 
+            className={`font-label-caps text-label-caps pb-1 transition-all duration-200 ${
+              activeTab === "kitabghar" 
+                ? "text-primary border-b-2 border-primary" 
+                : "text-on-surface-variant hover:text-primary hover:opacity-80"
+            }`}
+            onClick={() => { setActiveTab("kitabghar"); setFocusMode(false); }}
+          >
+            Kitabghar
+          </button>
+        </div>
 
-          {/* TAB 2: AI WRITING ROOM (Selected Poem Detail & Editor) */}
-          {activeTab === "poems" && selectedPoemId && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[calc(100vh-230px)]">
-              
-              {/* LEFT BOARD: Writing canvas */}
-              <div className="lg:col-span-6 flex flex-col justify-between glass p-6 rounded-2xl border border-poetry-border/40 relative">
-                
-                {/* Editor Header */}
-                <div className="border-b border-poetry-border/30 pb-4 mb-4 flex items-center justify-between">
-                  <button 
-                    onClick={() => { setSelectedPoemId(null); setActiveTab("dashboard"); }}
-                    className="text-poetry-muted hover:text-poetry-text flex items-center gap-1.5 text-sm"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back to Feed
-                  </button>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs bg-poetry-accent/10 border border-poetry-accent/20 px-2 py-1 rounded text-poetry-accent font-medium capitalize">
-                      {saveStatus}
-                    </span>
-                    <button 
-                      onClick={runPipelineReanalysis}
-                      className="bg-poetry-accent/20 hover:bg-poetry-accent/35 text-poetry-accent border border-poetry-accent/30 p-2 rounded-lg transition-all"
-                      title="Re-run AI Analysis"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
-                  </div>
+        <div className="flex items-center gap-base">
+          <button 
+            className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-outline-variant/30 transition-colors"
+            onClick={() => setFocusMode(!focusMode)} 
+            title="Toggle Focus Mode"
+          >
+            <span className="material-symbols-outlined text-on-surface">
+              {focusMode ? "fullscreen_exit" : "fullscreen"}
+            </span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Main Workspace based on active Tab */}
+      <main className="flex-grow w-full flex flex-col">
+        
+        {/* ==================== 1. DASHBOARD VIEW ==================== */}
+        {activeTab === "dashboard" && (
+          <div className="flex-grow pt-32 pb-stack-lg px-container-padding-mobile md:px-container-padding-desktop max-w-7xl mx-auto w-full">
+            <header className="mb-stack-lg text-center md:text-left">
+              <h1 className="font-display-hero text-display-hero text-primary">Your Studio</h1>
+              <p className="font-body-lg text-body-lg text-on-surface-variant mt-base">A sanctuary for your words.</p>
+            </header>
+            
+            {/* Bento Grid Layout */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+              {/* KPI Section (Left Column, Spanning 8 cols) */}
+              <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-gutter">
+                {/* KPI Card 1 */}
+                <div className="bg-surface-container-lowest border border-surface-variant rounded hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)] transition-shadow duration-300 p-stack-md flex flex-col justify-center items-center text-center">
+                  <span className="material-symbols-outlined text-secondary mb-base" style={{ fontSize: "32px" }}>menu_book</span>
+                  <h3 className="font-headline-lg text-headline-lg text-primary">{poems.length}</h3>
+                  <p className="font-label-caps text-label-caps text-on-surface-variant">Total Poems</p>
                 </div>
-
-                {/* Editor Canvas */}
-                <div className="flex-1 flex flex-col justify-start">
-                  <input 
-                    type="text" 
-                    value={editingTitle} 
-                    onChange={(e) => handleEditorUpdate(editingText, e.target.value)}
-                    placeholder="Enter Poem Title..."
-                    className="w-full text-2xl font-bold bg-transparent outline-none border-b border-transparent focus:border-poetry-border/30 pb-2 mb-4 text-white font-serif italic"
-                  />
-                  <textarea 
-                    value={editingText} 
-                    onChange={(e) => handleEditorUpdate(e.target.value)}
-                    placeholder="लिखना शुरू करें..."
-                    className="w-full flex-1 poetry-editor overflow-y-auto"
-                  />
+                {/* KPI Card 2 */}
+                <div className="bg-surface-container-lowest border border-surface-variant rounded hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)] transition-shadow duration-300 p-stack-md flex flex-col justify-center items-center text-center">
+                  <span className="material-symbols-outlined text-secondary mb-base" style={{ fontSize: "32px" }}>edit_document</span>
+                  <h3 className="font-headline-lg text-headline-lg text-primary">
+                    {(poems.reduce((acc, p) => acc + getWordCount(p.original_text), 0)).toLocaleString()}
+                  </h3>
+                  <p className="font-label-caps text-label-caps text-on-surface-variant">Words Written</p>
                 </div>
+                {/* KPI Card 3 */}
+                <div className="bg-surface-container-lowest border border-surface-variant rounded hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)] transition-shadow duration-300 p-stack-md flex flex-col justify-center items-center text-center">
+                  <span className="material-symbols-outlined text-secondary mb-base" style={{ fontSize: "32px" }}>public</span>
+                  <h3 className="font-headline-lg text-headline-lg text-primary">
+                    {poems.filter(p => !p.is_draft).length}
+                  </h3>
+                  <p className="font-label-caps text-label-caps text-on-surface-variant">Published Pieces</p>
+                </div>
+              </div>
 
-                {/* Editor Footer Tools */}
-                <div className="border-t border-poetry-border/30 pt-4 mt-4 flex items-center justify-between">
-                  <div className="text-xs text-poetry-muted font-medium">
-                    Lines: {editingText.split('\n').filter(Boolean).length} | Words: {editingText.split(/\s+/).filter(Boolean).length}
+              {/* Connected Sources Section (Right Column, Spanning 4 cols) */}
+              <div className="md:col-span-4 bg-surface-container-lowest border border-surface-variant rounded p-stack-md flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-stack-md">
+                    <h2 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">Sources</h2>
+                    <span className="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors">settings</span>
                   </div>
                   
+                  {importing ? (
+                    <div className="p-4 border border-outline-variant rounded bg-surface-container-low space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-label-caps text-label-caps font-bold text-secondary animate-pulse">Syncing notes...</span>
+                        <span className="text-xs text-on-surface-variant capitalize">{pipelineStep} Agent active</span>
+                      </div>
+                      <div className="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-secondary h-full transition-all duration-500" 
+                          style={{ 
+                            width: pipelineStep === "fetch" ? "15%" :
+                                   pipelineStep === "translation" ? "35%" :
+                                   pipelineStep === "meter" ? "60%" :
+                                   pipelineStep === "audience" ? "80%" :
+                                   pipelineStep === "design" ? "90%" : "100%" 
+                          }}
+                        ></div>
+                      </div>
+                      <div className="text-[11px] text-on-surface-variant max-h-24 overflow-y-auto font-mono space-y-1">
+                        {logs.slice(0, 3).map(l => (
+                          <div key={l.id}>• {l.payload_json?.msg || l.event_name}</div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div 
+                      className="flex items-center gap-stack-sm p-4 border border-outline-variant rounded bg-surface transition-colors hover:bg-surface-container-low cursor-pointer"
+                      onClick={triggerGoogleKeepImport}
+                    >
+                      <span className="material-symbols-outlined text-[#F4B400]" style={{ fontVariationSettings: '"FILL" 1' }}>note</span>
+                      <div className="flex-grow">
+                        <h4 className="font-body-md text-body-md font-bold text-primary">Google Keep</h4>
+                        <p className="font-label-caps text-label-caps text-on-surface-variant">Sync from Google Keep</p>
+                      </div>
+                      <span className="material-symbols-outlined text-secondary">sync</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-base flex items-center justify-center p-4 border border-dashed border-outline-variant rounded cursor-pointer hover:bg-surface-container-low transition-colors">
+                  <span className="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">add</span>
+                    Add Source
+                  </span>
+                </div>
+              </div>
+
+              {/* Recent Poems List (Full Width, Spanning 12 cols) */}
+              <div className="md:col-span-12 mt-stack-md">
+                <div className="flex items-center justify-between mb-stack-md">
+                  <h2 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">Recent Works</h2>
                   <button 
-                    onClick={fetchEditorImprovements}
-                    disabled={loadingSuggestions}
-                    className="bg-poetry-accent text-poetry-bg font-bold text-xs py-2 px-4 rounded-lg flex items-center gap-1.5 shadow-md shadow-poetry-accent/20"
+                    className="font-label-caps text-label-caps text-secondary hover:underline"
+                    onClick={() => setActiveTab("kitabghar")}
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    {loadingSuggestions ? 'Polishing...' : 'Suggest AI Improvements'}
+                    View All Collection
                   </button>
                 </div>
-
-                {/* Floating Suggestions Drawer */}
-                {suggestions.length > 0 && (
-                  <div className="absolute inset-x-6 bottom-20 glass-dark border border-poetry-accent/40 p-4 rounded-xl shadow-2xl space-y-3 z-20 max-h-60 overflow-y-auto">
-                    <div className="flex justify-between items-center border-b border-poetry-border/20 pb-2">
-                      <span className="text-sm font-bold text-poetry-accent flex items-center gap-1">
-                        <Sparkles className="w-4 h-4" />
-                        Voice-Preserving Suggestions
-                      </span>
-                      <button onClick={() => setSuggestions([])} className="text-poetry-muted hover:text-white text-xs">Dismiss</button>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+                  {poems.slice(0, 3).map((poem, index) => (
+                    <div 
+                      key={poem.id} 
+                      className="bg-surface-container-lowest border border-surface-variant rounded p-8 hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)] transition-all duration-300 group cursor-pointer flex flex-col"
+                      onClick={() => {
+                        selectPoem(poem.id);
+                        setActiveTab("kaagaz");
+                      }}
+                    >
+                      <div className="flex justify-between items-start mb-stack-sm">
+                        <span className={`px-2 py-1 rounded font-label-caps text-label-caps ${
+                          poem.is_draft 
+                            ? "bg-secondary-container text-on-secondary-container" 
+                            : "bg-tertiary-fixed text-on-tertiary-fixed"
+                        }`}>
+                          {poem.is_draft ? "Draft" : "Published"}
+                        </span>
+                        <span className="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">more_vert</span>
+                      </div>
+                      <h3 className="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary mb-2 font-display-hero">
+                        {poem.title || "Untitled"}
+                      </h3>
+                      <p className="font-body-md text-body-md text-on-surface-variant line-clamp-3 mb-stack-md flex-grow whitespace-pre-wrap">
+                        {poem.original_text}
+                      </p>
+                      <div className="mt-auto flex justify-between items-center border-t border-surface-variant pt-4">
+                        <span className="font-label-caps text-label-caps text-on-surface-variant">
+                          {new Date(poem.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                        <span className="font-label-caps text-label-caps text-on-surface-variant">
+                          {poem.category || "Poem"}
+                        </span>
+                      </div>
                     </div>
-                    {suggestions.map((s, i) => (
-                      <div key={i} className="text-xs space-y-2">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <span className="text-poetry-muted block uppercase text-[9px] font-semibold">Original:</span>
-                            <span className="text-red-400 line-through font-serif">{s.original_line}</span>
-                          </div>
-                          <div>
-                            <span className="text-poetry-accent block uppercase text-[9px] font-semibold">Suggested:</span>
-                            <span className="text-emerald-400 font-serif">{s.suggested_line}</span>
-                          </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 2. KAAGAZ EDITOR VIEW ==================== */}
+        {activeTab === "kaagaz" && (
+          <div className="flex-grow flex pt-28 pb-stack-lg max-w-7xl mx-auto w-full px-container-padding-mobile md:px-container-padding-desktop gap-stack-md relative">
+            
+            {/* Central Editor Canvas */}
+            <section className="flex-grow py-8 relative flex flex-col w-full max-w-[720px] mx-auto">
+              
+              {/* Metadata Area */}
+              <div className="mb-stack-lg sidebar-transition">
+                <input 
+                  className="w-full bg-transparent border-0 border-b border-surface-variant focus:border-primary focus:ring-0 font-headline-lg text-headline-lg text-primary placeholder:text-outline-variant pb-2 px-0 transition-colors" 
+                  value={editingTitle}
+                  onChange={(e) => handleEditorUpdate(editingText, e.target.value)}
+                  placeholder="Untitled Poem" 
+                  type="text"
+                />
+                <div className="flex gap-4 mt-4 items-center">
+                  <span className="font-label-caps text-label-caps bg-surface-container-highest px-3 py-1 rounded border border-outline-variant text-on-surface-variant">
+                    {poemDetails?.poem?.category || "Free Verse"}
+                  </span>
+                  <span className="text-xs text-on-surface-variant italic font-label-caps">
+                    {saveStatus}
+                  </span>
+                </div>
+              </div>
+
+              {/* The Editor Canvas (Simulating physical sheet of paper) */}
+              <div className="flex-grow relative bg-surface-container-lowest border border-surface-variant rounded-lg p-8 shadow-sm flex flex-col min-h-[500px]">
+                <textarea 
+                  className="w-full flex-grow resize-none bg-transparent border-0 focus:ring-0 font-verse-primary text-verse-primary text-primary placeholder:text-outline p-0 leading-loose outline-none focus:outline-none"
+                  value={editingText}
+                  onChange={(e) => handleEditorUpdate(e.target.value)}
+                  placeholder="Let the words breathe..."
+                />
+                
+                {/* Save status / Word count count indicator */}
+                <div className="mt-4 pt-2 border-t border-surface-variant flex justify-between items-center text-xs text-on-surface-variant font-label-caps">
+                  <span>Words: {getWordCount(editingText)}</span>
+                  <span>Lines: {editingText.split('\n').filter(Boolean).length}</span>
+                </div>
+              </div>
+
+              {/* Action Toolbar */}
+              <div className="mt-6 flex justify-between items-center">
+                <button 
+                  className="flex items-center gap-2 bg-primary text-on-primary hover:opacity-80 transition-opacity px-6 py-3 rounded shadow-sm font-label-caps text-label-caps text-xs uppercase tracking-wider disabled:opacity-50"
+                  onClick={runPipelineReanalysis}
+                  disabled={isAnalyzing || (!editingText && !editingTitle)}
+                >
+                  <span className="material-symbols-outlined text-sm">
+                    {isAnalyzing ? "sync" : "auto_awesome"}
+                  </span>
+                  {isAnalyzing ? "Analyzing with LangGraph..." : "Run AI Critique"}
+                </button>
+                
+                <button 
+                  className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors font-label-caps text-label-caps text-xs"
+                  onClick={() => setActiveTab("kitabghar")}
+                >
+                  <span className="material-symbols-outlined text-sm">book</span>
+                  View Reading Layout
+                </button>
+              </div>
+            </section>
+
+            {/* Right Sidebar: Translation */}
+            <aside className="w-1/3 py-8 sidebar-transition sidebar-transition-right hidden lg:flex flex-col gap-stack-sm">
+              <div className="border-b border-outline-variant pb-2">
+                <h2 className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Live Translation</h2>
+              </div>
+              <div className="flex-grow bg-surface-container-low rounded-lg p-8 border border-outline-variant shadow-sm flex flex-col justify-between">
+                <div className="space-y-4">
+                  <p className="font-label-caps text-[11px] text-secondary uppercase tracking-widest font-bold">Hindi & Hinglish Render</p>
+                  <div className="font-verse-primary text-verse-primary text-on-surface-variant whitespace-pre-wrap leading-loose italic max-h-[400px] overflow-y-auto">
+                    {poemDetails?.translations?.find(t => t.language.includes("Hindi"))?.content || 
+                     (editingText ? "अनुवाद लोड हो रहा है..." : "लेखन शुरू करें...")}
+                  </div>
+                </div>
+                <div className="border-t border-outline-variant pt-4 text-xs text-outline italic">
+                  Translation updates dynamically as you type.
+                </div>
+              </div>
+            </aside>
+          </div>
+        )}
+
+        {/* ==================== 3. KITABGHAR VIEW ==================== */}
+        {activeTab === "kitabghar" && (
+          <div className="flex-grow flex pt-28 pb-stack-lg max-w-[1440px] mx-auto w-full px-container-padding-mobile relative">
+            
+            {/* Left Sidebar: Collection list */}
+            <aside className="w-[260px] bg-surface-container-low border border-outline-variant z-40 hidden md:flex flex-col py-8 px-6 my-8 rounded-xl shadow-sm border sidebar-transition shrink-0 h-[calc(100vh-12rem)] overflow-y-auto">
+              <h2 className="font-label-caps text-label-caps text-on-surface-variant mb-6 tracking-widest font-bold">YOUR COLLECTION</h2>
+              <nav className="flex flex-col gap-2">
+                {poems.map(poem => {
+                  const isActive = poem.id === selectedPoemId;
+                  return (
+                    <button 
+                      key={poem.id}
+                      className={`flex items-center text-left px-3 py-2 rounded text-sm relative transition-colors ${
+                        isActive 
+                          ? "bg-secondary-container/50 text-primary font-bold" 
+                          : "text-on-surface-variant hover:bg-outline-variant/20 hover:text-primary"
+                      }`}
+                      onClick={() => selectPoem(poem.id)}
+                    >
+                      {isActive && <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-secondary rounded-full"></div>}
+                      <span className="truncate">{poem.title || "Untitled"}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </aside>
+
+            {/* Central Canvas Reader */}
+            <main className="flex-grow max-w-[720px] mx-auto py-8 flex flex-col relative group md:ml-12">
+              <div className="absolute inset-0 bg-surface-container-lowest opacity-0 group-hover:opacity-100 transition-opacity duration-1000 shadow-[0_0_20px_rgba(0,0,0,0.03)] -z-10 rounded-lg pointer-events-none hidden md:block"></div>
+              
+              <article className="relative z-10 flex flex-col items-center flex-grow pt-12 pb-24 px-8 md:px-16 transition-all duration-500 shadow-none">
+                
+                {/* Metadata Header */}
+                <header className="text-center mb-16 flex flex-col items-center">
+                  <div className="inline-block px-3 py-1 bg-secondary-fixed/30 rounded font-label-caps text-label-caps text-on-secondary-fixed mb-stack-md tracking-widest uppercase">
+                    {poemDetails?.poem?.category || "Verse"}
+                  </div>
+                  <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary mb-stack-sm max-w-2xl leading-tight font-display-hero">
+                    {editingTitle || "Untitled"}
+                  </h1>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="w-8 h-[1px] bg-outline-variant"></div>
+                    <p className="font-body-md text-body-md text-on-surface-variant italic">
+                      By {poemDetails?.poem?.author || "Writer"}
+                    </p>
+                    <div className="w-8 h-[1px] bg-outline-variant"></div>
+                  </div>
+                </header>
+
+                {/* Poem Body */}
+                <div className="font-verse-primary text-verse-primary text-on-surface whitespace-pre-wrap max-w-prose text-left mx-auto leading-loose selection:bg-tertiary-fixed selection:text-on-tertiary-fixed">
+                  {editingText || "This poem is empty."}
+                </div>
+
+                <div className="mt-20 border-t border-outline-variant pt-6 w-full flex justify-center gap-4">
+                  <button 
+                    className="flex items-center gap-2 text-xs font-label-caps text-secondary hover:underline"
+                    onClick={() => {
+                      selectPoem(selectedPoemId); // fetch exact current draft poem values
+                      setFocusMode(false);
+                      setActiveTab("kaagaz");
+                    }}
+                  >
+                    <span className="material-symbols-outlined text-sm">edit</span>
+                    Edit Poem
+                  </button>
+                </div>
+              </article>
+            </main>
+          </div>
+        )}
+
+        {/* ==================== 4. AGENT REVIEW VIEW ==================== */}
+        {activeTab === "review" && (
+          <div className="flex-grow pt-28 pb-stack-lg px-container-padding-desktop max-w-[1440px] mx-auto w-full">
+            
+            {/* Workspace Header */}
+            <div className="flex justify-between items-end mb-stack-lg border-b border-outline-variant pb-base">
+              <div>
+                <h2 className="text-xs font-label-caps text-on-surface-variant tracking-wider uppercase mb-1">
+                  AI Review Evidence report
+                </h2>
+                <h1 className="font-display-hero text-display-hero text-primary mb-2 font-bold">
+                  {editingTitle}
+                </h1>
+                <div className="flex gap-2">
+                  <span className="bg-secondary-fixed text-on-secondary-fixed font-label-caps text-label-caps px-3 py-1 rounded-sm uppercase">
+                    {poemDetails?.poem?.category || "Nazm"}
+                  </span>
+                  <span className="bg-surface-container-high text-on-surface-variant font-label-caps text-label-caps px-3 py-1 rounded-sm uppercase">
+                    {poemDetails?.poem?.is_published ? "Published" : "Draft"}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex gap-stack-sm">
+                <button 
+                  className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors px-4 py-2 border border-outline-variant rounded bg-white text-xs font-label-caps shadow-sm"
+                  onClick={() => setActiveTab("kaagaz")}
+                >
+                  <span className="material-symbols-outlined text-[18px]">edit</span>
+                  <span>Back to Kaagaz</span>
+                </button>
+                <button 
+                  className="flex items-center gap-2 bg-primary text-on-primary hover:opacity-85 transition-opacity px-6 py-2 rounded text-xs font-label-caps uppercase tracking-wide shadow-sm"
+                  onClick={approveAndPublishStaged}
+                >
+                  <span className="material-symbols-outlined text-[18px]">publish</span>
+                  <span>Approve & Publish</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 3-Column Layout */}
+            <div className="grid grid-cols-12 gap-gutter relative">
+              
+              {/* Left Column: Meter Agent (Technical) */}
+              <aside className="col-span-12 md:col-span-3 space-y-stack-md">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: '"FILL" 1' }}>graphic_eq</span>
+                  <h3 className="font-label-caps text-label-caps text-secondary tracking-widest uppercase font-bold">Meter Agent</h3>
+                </div>
+
+                <div className="bg-surface-container-lowest border border-outline-variant p-4 rounded ambient-shadow relative space-y-3">
+                  <div className="font-label-caps text-label-caps text-on-surface-variant font-bold">Line-by-Line Syllable Count</div>
+                  
+                  {/* Visually displays the matra count evidence for each line of the selected poem */}
+                  <div className="space-y-2">
+                    {poemDetails?.meter_analysis?.matra_counts_json?.map((m, mIdx) => (
+                      <div key={mIdx} className="flex flex-col gap-1 p-2 bg-surface-container-low rounded border border-outline-variant">
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="truncate max-w-[140px] italic">"{m.line_text}"</span>
+                          <span className="font-bold text-secondary font-mono">{m.matra_count} Matras</span>
                         </div>
-                        <p className="text-poetry-text bg-white/5 p-2 rounded border border-poetry-border/10">
-                          <strong>Change:</strong> {s.change_summary} <br />
-                          <strong>Impact:</strong> {s.emotional_impact}
-                        </p>
-                        <button 
-                          onClick={() => { applyMeterSuggestion(s.original_line, s.suggested_line); setSuggestions([]); }}
-                          className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/35 border border-emerald-500/30 text-[10px] py-1 px-3 rounded font-bold"
-                        >
-                          Apply Replacement
-                        </button>
+                        {/* Visual Matra Bar */}
+                        <div className="w-full bg-surface-container-high h-1 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-secondary h-full"
+                            style={{ width: `${Math.min(100, (m.matra_count / 28) * 100)}%` }}
+                          ></div>
+                        </div>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
 
-              {/* RIGHT BOARD: AI Analysis tabs */}
-              <div className="lg:col-span-6 flex flex-col glass rounded-2xl border border-poetry-border/40 overflow-hidden">
-                
-                {/* Tab selector */}
-                <div className="bg-poetry-darker/60 border-b border-poetry-border/20 p-2 flex gap-1 overflow-x-auto">
-                  {[
-                    { id: "flow", label: "LangGraph Flow", icon: Activity },
-                    { id: "translations", label: "Translations", icon: Languages },
-                    { id: "meter", label: "Meter & Rhythm", icon: BookOpenCheck },
-                    { id: "reviews", label: "Audience Reviews", icon: Users },
-                    { id: "design", label: "Social Cards", icon: ImageIcon },
-                    { id: "publish", label: "Publish Staging", icon: Share2 },
-                    { id: "history", label: "History Diff", icon: History }
-                  ].map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveDetailTab(tab.id)}
-                      className={`text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-all ${activeDetailTab === tab.id ? 'bg-poetry-accent/15 text-poetry-accent font-semibold border border-poetry-accent/30' : 'text-poetry-muted hover:text-poetry-text'}`}
-                    >
-                      <tab.icon className="w-3.5 h-3.5" />
-                      {tab.label}
-                    </button>
-                  ))}
+                  <div className="border-t border-outline-variant pt-3 flex justify-between items-center text-[11px] text-secondary font-label-caps font-bold">
+                    <span>Base Bahr: {poemDetails?.meter_analysis?.bahr_chhand || "Baseline"}</span>
+                  </div>
                 </div>
 
-                {/* Tab panels */}
-                <div className="flex-1 p-6 overflow-y-auto">
-
-                  {/* 1. LangGraph Execution Flow */}
-                  {activeDetailTab === "flow" && (
-                    <div className="space-y-6">
-                      <div className="border-b border-poetry-border/20 pb-2">
-                        <h5 className="font-bold text-white">LangGraph Orchestrator Execution State</h5>
-                        <p className="text-xs text-poetry-muted">Visual state machine tracking active agents and output logs.</p>
-                      </div>
-
-                      {/* Visual Flow diagram */}
-                      <div className="space-y-4">
-                        {[
-                          { id: "fetch", label: "Fetch note", desc: "Formatting, normalization and title cleanup" },
-                          { id: "translation", label: "Translation Agent", desc: "Generating Hinglish & English poetry variants" },
-                          { id: "meter", label: "Meter Agent", desc: "Rule-based syllables count and meter mapping" },
-                          { id: "audience", label: "Audience Personas", desc: "Parallel critique: Romantic, Critic, Instagrammer" },
-                          { id: "design", label: "Design Agent", desc: "Drawing social visual cards using Pillow" },
-                          { id: "publish", label: "Publish Agent", desc: "Staging schedules and API logging" }
-                        ].map((node, i) => {
-                          const isActive = pipelineStep === node.id;
-                          const isDone = pipelineStep === null || (
-                            node.id === "fetch" && pipelineStep !== "fetch" ||
-                            node.id === "translation" && !["fetch", "translation"].includes(pipelineStep) ||
-                            node.id === "meter" && !["fetch", "translation", "meter"].includes(pipelineStep) ||
-                            node.id === "audience" && ["design", "publish", "done"].includes(pipelineStep) ||
-                            node.id === "design" && ["publish", "done"].includes(pipelineStep) ||
-                            node.id === "publish" && pipelineStep === "done"
-                          );
-
-                          return (
-                            <div key={node.id} className="flex gap-4 items-start relative">
-                              {i < 5 && (
-                                <div className="absolute left-4 top-8 bottom-0 w-0.5 bg-poetry-border/25" />
-                              )}
-                              
-                              <div className={`w-8.5 h-8.5 rounded-full flex items-center justify-center border font-bold text-xs shrink-0 z-10 transition-all ${isDone ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : isActive ? 'bg-poetry-accent/20 border-poetry-accent text-poetry-accent animate-pulse' : 'bg-poetry-darker border-poetry-border text-poetry-muted'}`}>
-                                {isDone ? <Check className="w-4 h-4" /> : i + 1}
-                              </div>
-
-                              <div className={`p-3 rounded-lg border flex-1 transition-all ${isActive ? 'glass-accent border-poetry-accent' : 'bg-white/5 border-poetry-border/20'}`}>
-                                <h6 className="font-semibold text-xs text-white flex items-center justify-between">
-                                  {node.label}
-                                  {isActive && <span className="text-[10px] text-poetry-accent font-semibold tracking-widest uppercase animate-pulse">Running</span>}
-                                  {isDone && <span className="text-[10px] text-emerald-400 font-semibold tracking-widest uppercase">Done</span>}
-                                </h6>
-                                <p className="text-[11px] text-poetry-muted mt-1 leading-relaxed">{node.desc}</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 2. Translations */}
-                  {activeDetailTab === "translations" && (
-                    <div className="space-y-6">
-                      {poemDetails?.translations.map((t, idx) => (
-                        <div key={idx} className="glass p-4 rounded-xl border border-poetry-border/20 space-y-3 relative group">
-                          <div className="flex justify-between items-center border-b border-poetry-border/10 pb-2">
-                            <span className="text-xs font-bold text-poetry-accent uppercase tracking-wider">{t.language} Variant</span>
-                            <button 
-                              onClick={() => { navigator.clipboard.writeText(t.content); alert("Copied to clipboard!"); }}
-                              className="text-poetry-muted hover:text-white group-hover:block transition-all"
-                              title="Copy translation text"
-                            >
-                              <Copy className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <p className="font-serif text-sm leading-relaxed whitespace-pre-line text-poetry-text italic">
-                            {t.content}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 3. Meter & Rhythm */}
-                  {activeDetailTab === "meter" && (
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white/5 p-3 rounded-lg border border-poetry-border/20 text-center">
-                          <span className="text-[10px] text-poetry-muted uppercase block">Poetic Structure</span>
-                          <span className="font-bold text-sm text-white capitalize">{poemDetails?.meter_analysis?.bahr_chhand || 'Matra baseline: 24'}</span>
-                        </div>
-                        <div className="bg-white/5 p-3 rounded-lg border border-poetry-border/20 text-center">
-                          <span className="text-[10px] text-poetry-muted uppercase block">Rhyme Pattern</span>
-                          <span className="font-bold text-sm text-white capitalize">{poemDetails?.meter_analysis?.rhyming_consistency || 'Consistent'}</span>
-                        </div>
-                      </div>
-
-                      {/* Line-by-line matra visual counts */}
-                      <div className="space-y-3">
-                        <h6 className="text-xs font-bold text-poetry-accent uppercase tracking-widest">Matra Syllables Count Per Line</h6>
-                        <div className="space-y-2">
-                          {poemDetails?.meter_analysis?.matra_counts_json?.map((item, idx) => {
-                            // Baseline is the first line
-                            const baseCount = poemDetails.meter_analysis.matra_counts_json[0].matra_count;
-                            const isMismatch = Math.abs(item.matra_count - baseCount) > 1;
-
-                            return (
-                              <div key={idx} className={`p-3 rounded-lg flex items-center justify-between border ${isMismatch ? 'bg-amber-500/10 border-amber-500/30' : 'bg-white/5 border-poetry-border/10'}`}>
-                                <div className="space-y-1">
-                                  <span className="text-[9px] text-poetry-muted block">Line {item.line_number}</span>
-                                  <p className="font-serif text-xs text-white">{item.line_text}</p>
-                                </div>
-                                <span className={`text-xs font-bold px-2 py-1 rounded shrink-0 ${isMismatch ? 'bg-amber-500 text-poetry-bg' : 'bg-poetry-accent/15 text-poetry-accent'}`}>
-                                  {item.matra_count} Matras
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Line replacements suggestions */}
-                      {poemDetails?.meter_analysis?.suggestions_json?.length > 0 && (
-                        <div className="space-y-3 border-t border-poetry-border/20 pt-4">
-                          <h6 className="text-xs font-bold text-amber-400 uppercase tracking-widest flex items-center gap-1">
-                            <AlertCircle className="w-4 h-4" />
-                            Meter Corrections Suggested
-                          </h6>
-                          {poemDetails.meter_analysis.suggestions_json.map((s, idx) => (
-                            <div key={idx} className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl space-y-3">
-                              <p className="text-xs text-poetry-muted">
-                                <strong>Line {s.line_number} rhythm deviation:</strong> {s.reason}
-                              </p>
-                              {s.recommendations?.map((rec, rIdx) => (
-                                <div key={rIdx} className="flex items-center justify-between bg-poetry-bg/60 p-3 rounded-lg border border-poetry-border/15">
-                                  <div className="text-xs">
-                                    Replace <span className="text-red-400 font-bold font-serif">"{rec.replace}"</span> with <span className="text-emerald-400 font-bold font-serif">"{rec.with}"</span>
-                                    <span className="block text-[10px] text-poetry-muted mt-0.5">{rec.reason || 'Fits 24 matras'}</span>
-                                  </div>
-                                  <button
-                                    onClick={() => applyMeterSuggestion(s.line_text, s.line_text.replace(rec.replace, rec.with))}
-                                    className="bg-poetry-accent hover:bg-poetry-gold text-poetry-bg text-[10px] px-3 py-1.5 rounded font-bold flex items-center gap-1 shrink-0"
-                                  >
-                                    Swap Word
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 4. Audience Reviews */}
-                  {activeDetailTab === "reviews" && (
-                    <div className="space-y-6">
-                      {/* Aggregator Score Card */}
-                      {poemDetails?.audience_reviews?.filter(r => r.persona_name === "Aggregator").map((agg, idx) => (
-                        <div key={idx} className="bg-gradient-to-br from-poetry-accent/20 to-poetry-gold/10 p-5 rounded-xl border border-poetry-accent/35 flex items-center gap-5 justify-between">
-                          <div className="space-y-2">
-                            <span className="text-[10px] text-poetry-accent font-bold uppercase tracking-widest">Aggregate Feedback Verdict</span>
-                            <h6 className="font-bold text-white text-sm">{agg.final_emotion || 'Romantic Melancholy'}</h6>
-                            <p className="text-[11px] text-poetry-text italic mt-1 leading-relaxed">
-                              "{agg.suggestion}"
-                            </p>
-                          </div>
-                          <div className="bg-poetry-bg p-4 rounded-full border-2 border-poetry-accent text-center shrink-0 min-w-20">
-                            <span className="text-3xl font-extrabold text-poetry-accent">{agg.rating}</span>
-                            <span className="block text-[9px] text-poetry-muted uppercase font-bold">Consensus</span>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Individual Reviews Persona Carousel */}
-                      <div className="space-y-4">
-                        <h6 className="text-xs font-bold text-poetry-accent uppercase tracking-widest">AI Persona Criticisms</h6>
-                        <div className="space-y-4">
-                          {poemDetails?.audience_reviews?.filter(r => r.persona_name !== "Aggregator").map((rev, idx) => {
-                            const isRomantic = rev.persona_name === "Romantic Lover";
-                            const isCritic = rev.persona_name === "Literary Critic";
-                            const isInsta = rev.persona_name === "Instagram Reader";
-                            
-                            return (
-                              <div key={idx} className="glass p-4 rounded-xl border border-poetry-border/20 space-y-3">
-                                <div className="flex justify-between items-center border-b border-poetry-border/10 pb-2">
-                                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                                    {isRomantic && <Heart className="w-4 h-4 text-red-500 fill-red-500" />}
-                                    {isCritic && <BookOpenCheck className="w-4 h-4 text-blue-400" />}
-                                    {isInsta && <Instagram className="w-4 h-4 text-pink-500" />}
-                                    {rev.persona_name}
-                                  </span>
-                                  <span className="bg-poetry-accent/15 border border-poetry-accent/30 text-poetry-accent text-xs px-2 py-0.5 rounded font-bold">
-                                    {rev.rating}/10 Vibe
-                                  </span>
-                                </div>
-                                <div className="space-y-1.5 text-xs text-poetry-text">
-                                  <p><strong>Primary Vibe:</strong> <span className="text-poetry-accent font-medium">{rev.final_emotion}</span></p>
-                                  <p><strong>Favorite Line:</strong> <span className="font-serif italic text-white">"{rev.favorite_line}"</span></p>
-                                  {rev.confusing_line && <p><strong>Confusing Line:</strong> <span className="font-serif text-poetry-muted line-through">"{rev.confusing_line}"</span></p>}
-                                  <p><strong>Strengths:</strong> {rev.strengths_json?.join(", ")}</p>
-                                  <p><strong>Weaknesses:</strong> {rev.weaknesses_json?.join(", ")}</p>
-                                  <p className="bg-white/5 p-2 rounded text-poetry-muted border border-poetry-border/5">
-                                    <strong>Recommendation:</strong> {rev.suggestion}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 5. Design Card templates */}
-                  {activeDetailTab === "design" && (
-                    <div className="space-y-6">
-                      <div className="border-b border-poetry-border/20 pb-2">
-                        <h5 className="font-bold text-white">Programmatic Social Cards Generator</h5>
-                        <p className="text-xs text-poetry-muted">Design visuals using preconfigured templates generated by Pillow backend.</p>
-                      </div>
-
-                      {/* Template Selector Tabs */}
-                      <div className="flex gap-2">
-                        {["Dark", "Vintage", "Minimal", "Paper"].map(t => (
-                          <button
-                            key={t}
-                            onClick={() => setActiveTemplate(t)}
-                            className={`text-xs px-3.5 py-1.5 rounded-full border transition-all ${activeTemplate === t ? 'bg-poetry-accent text-poetry-bg font-bold border-poetry-accent' : 'bg-poetry-darker border-poetry-border text-poetry-muted hover:text-poetry-text'}`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Image Preview Container */}
-                      <div className="aspect-square w-full glass rounded-xl overflow-hidden border border-poetry-border/30 relative flex flex-col items-center justify-center p-8 text-center bg-zinc-950">
-                        
-                        {/* Simulation of visually stunning pillow graphic card */}
-                        <div 
-                          className="w-full h-full rounded-lg border-2 flex flex-col justify-between p-12 transition-all shadow-2xl relative"
-                          style={{
-                            backgroundColor: activeTemplate === "Dark" ? "#140f23" : activeTemplate === "Vintage" ? "#efe1cb" : activeTemplate === "Minimal" ? "#fbfbfb" : "#dad8d2",
-                            borderColor: activeTemplate === "Dark" ? "#d4af37" : activeTemplate === "Vintage" ? "#8b5a2b" : activeTemplate === "Minimal" ? "#787878" : "#5a6e82",
-                            color: activeTemplate === "Dark" ? "#f5e6ff" : activeTemplate === "Vintage" ? "#412d1e" : activeTemplate === "Minimal" ? "#141414" : "#282832"
-                          }}
+                {/* Meter Annotation Suggestions */}
+                {poemDetails?.meter_analysis?.suggestions_json?.length > 0 ? (
+                  poemDetails.meter_analysis.suggestions_json.map((s, idx) => (
+                    <div key={idx} className="bg-surface-container-lowest border border-outline-variant p-4 rounded ambient-shadow relative border-l-4 border-l-secondary">
+                      <div className="font-label-caps text-label-caps text-on-surface-variant mb-1 font-bold">Line {s.line_number} Correction</div>
+                      <p className="text-[11px] text-on-surface mb-3 italic">"{s.line_text}"</p>
+                      <p className="text-xs text-on-surface mb-3 font-semibold text-secondary">{s.reason}</p>
+                      {s.recommendations?.map((rec, rIdx) => (
+                        <button 
+                          key={rIdx}
+                          className="w-full text-left bg-surface-container-low hover:bg-secondary-container/30 border border-outline-variant p-2 rounded text-xs text-primary transition-all font-body-md"
+                          onClick={() => applyMeterSuggestion(s.line_text, editingText.replace(rec.replace, rec.with))}
                         >
-                          {/* Inner decorative border */}
-                          <div 
-                            className="absolute inset-4 border rounded"
-                            style={{
-                              borderColor: activeTemplate === "Dark" ? "rgba(212, 175, 55, 0.3)" : activeTemplate === "Vintage" ? "rgba(139, 90, 43, 0.3)" : activeTemplate === "Minimal" ? "rgba(120, 120, 120, 0.2)" : "rgba(90, 110, 130, 0.2)"
-                            }}
-                          />
-                          
-                          {/* Header / Title */}
-                          <div className="text-center space-y-1 z-10">
-                            <h6 className="font-serif font-bold text-2xl italic tracking-wide">{editingTitle}</h6>
-                            <div 
-                              className="w-16 h-0.5 mx-auto mt-2" 
-                              style={{ backgroundColor: activeTemplate === "Dark" ? "#d4af37" : activeTemplate === "Vintage" ? "#8b5a2b" : activeTemplate === "Minimal" ? "#787878" : "#5a6e82" }}
-                            />
-                          </div>
-
-                          {/* Body Poem lines */}
-                          <div className="text-center font-serif text-lg leading-relaxed z-10 italic py-6 space-y-4">
-                            {editingText.split('\n').filter(Boolean).slice(0, 3).map((l, i) => (
-                              <p key={i}>"{l}"</p>
-                            ))}
-                          </div>
-
-                          {/* Footer */}
-                          <div className="text-center text-xs tracking-widest font-bold z-10 opacity-70 uppercase">
-                            ~ Poetry Studio ~
-                          </div>
-                        </div>
-
-                      </div>
-
-                      {/* Download link trigger */}
-                      <button 
-                        onClick={() => {
-                          const link = document.createElement("a");
-                          link.href = "#";
-                          link.setAttribute("download", `poem_${editingTitle.toLowerCase().replace(/\s+/g, '_')}_${activeTemplate.toLowerCase()}.png`);
-                          alert(`Initiating download for ${activeTemplate} visual card PNG format.`);
-                        }}
-                        className="w-full bg-poetry-accent hover:bg-poetry-gold text-poetry-bg font-bold text-xs py-3 rounded-lg flex items-center justify-center gap-1.5 shadow-md shadow-poetry-accent/20"
-                      >
-                        <Download className="w-4 h-4" />
-                        Download Rendered Card PNG
-                      </button>
-                    </div>
-                  )}
-
-                  {/* 6. Publishing */}
-                  {activeDetailTab === "publish" && (
-                    <div className="space-y-6">
-                      <div className="border-b border-poetry-border/20 pb-2">
-                        <h5 className="font-bold text-white">Staging Scheduler Dashboard</h5>
-                        <p className="text-xs text-poetry-muted">Approve, queue, and publish cards to social networks.</p>
-                      </div>
-
-                      {/* Staged social settings card */}
-                      <div className="glass p-5 rounded-xl border border-poetry-border/25 space-y-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-white uppercase tracking-wide">Target Platforms</span>
-                          <span className="bg-amber-500/10 border border-amber-500/35 text-amber-500 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                            Pending Approval
-                          </span>
-                        </div>
-                        <div className="flex gap-4">
-                          {["Instagram", "Threads", "LinkedIn"].map((platform, i) => (
-                            <div key={i} className="flex items-center gap-1.5 bg-white/5 border border-poetry-border/10 py-1.5 px-3 rounded-lg text-xs font-semibold text-white">
-                              <Instagram className="w-3.5 h-3.5 text-poetry-accent" />
-                              {platform}
-                            </div>
-                          ))}
-                        </div>
-                        
-                        <div className="space-y-1.5">
-                          <span className="text-[10px] text-poetry-muted block uppercase font-bold">Staged Caption Payload</span>
-                          <div className="bg-poetry-darker p-3 rounded-lg border border-poetry-border/10 text-xs font-mono text-poetry-text leading-relaxed">
-                            New poetry: {editingTitle}. Crafting emotions in Devanagari. Generated with #PoetryStudio AI
-                          </div>
-                        </div>
-
-                        <div className="flex gap-4 border-t border-poetry-border/10 pt-4 text-xs text-poetry-muted font-medium">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            Scheduled: Instant Staging
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <ImageIcon className="w-4 h-4" />
-                            Visual Asset Attached
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Approval triggers */}
-                      <button 
-                        onClick={() => approveAndPublishStaged(selectedPoemId)}
-                        className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-poetry-bg font-extrabold text-xs py-3 rounded-lg flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/10 transition-all active:scale-98"
-                      >
-                        <Send className="w-4 h-4" />
-                        Approve and Publish Post
-                      </button>
-                    </div>
-                  )}
-
-                  {/* 7. History Timeline */}
-                  {activeDetailTab === "history" && (
-                    <div className="space-y-6">
-                      <div className="border-b border-poetry-border/20 pb-2">
-                        <h5 className="font-bold text-white">Version Revisions History</h5>
-                        <p className="text-xs text-poetry-muted">Line-by-line diff summaries showing all AI edits and manual savings.</p>
-                      </div>
-
-                      <div className="relative border-l border-poetry-border/25 ml-4 pl-6 space-y-6">
-                        {poemDetails?.versions.map((ver, idx) => (
-                          <div key={idx} className="relative space-y-2">
-                            {/* Bullet */}
-                            <div className="absolute -left-10 top-1 w-8.5 h-8.5 rounded-full bg-poetry-bg border border-poetry-border/30 flex items-center justify-center font-bold text-[10px] text-poetry-accent">
-                              v{ver.version_number}
-                            </div>
-                            
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="font-bold text-white">Modified by: {ver.created_by}</span>
-                              <span className="text-poetry-muted flex items-center gap-1">
-                                <Clock className="w-3.5 h-3.5" />
-                                {new Date(ver.created_at).toLocaleTimeString()}
-                              </span>
-                            </div>
-
-                            {/* Diff summary box */}
-                            {ver.diff_summary && (
-                              <div className="bg-poetry-darker/60 p-3 rounded-lg border border-poetry-border/10 text-xs leading-relaxed font-serif">
-                                <span className="text-[9px] text-poetry-accent uppercase font-bold block mb-1">Diff Summary</span>
-                                {ver.diff_summary.split('\n').map((line, lIdx) => {
-                                  let cls = "text-poetry-text";
-                                  if (line.startsWith('+')) cls = "diff-added";
-                                  else if (line.startsWith('-')) cls = "diff-removed";
-                                  else if (line.startsWith('?')) cls = "diff-info";
-                                  return (
-                                    <div key={lIdx} className={cls}>
-                                      {line}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* TAB 3: STAGING SCHEDULER VIEW */}
-          {activeTab === "publish" && (
-            <div className="space-y-6">
-              <div className="border-b border-poetry-border/20 pb-2">
-                <h4 className="text-lg font-bold text-white">Social Media Scheduled Pipeline Queue</h4>
-                <p className="text-xs text-poetry-muted">List of drafted campaigns waiting for approval before Simulated API Publishing.</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {poems.slice(0, 2).map((p, idx) => (
-                  <div key={idx} className="glass p-5 rounded-xl border border-poetry-border/25 space-y-4">
-                    <div className="flex justify-between items-center border-b border-poetry-border/10 pb-2.5">
-                      <div>
-                        <h5 className="font-bold text-white font-serif">{p.title}</h5>
-                        <span className="text-[10px] text-poetry-muted font-medium uppercase tracking-wider">Scheduled for: Instant Staging</span>
-                      </div>
-                      <span className="bg-amber-500/10 border border-amber-500/35 text-amber-500 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                        Pending
-                      </span>
-                    </div>
-
-                    <div className="flex gap-2">
-                      {["Instagram", "LinkedIn", "Threads"].map((plat, pIdx) => (
-                        <span key={pIdx} className="bg-white/5 border border-poetry-border/10 text-xs px-2.5 py-1 rounded text-poetry-text">
-                          {plat}
-                        </span>
+                          Replace <strong className="line-through text-red-700">{rec.replace}</strong> → <strong className="text-green-700">{rec.with}</strong>
+                        </button>
                       ))}
                     </div>
+                  ))
+                ) : (
+                  <div className="bg-surface-container-lowest border border-outline-variant p-4 rounded ambient-shadow text-center text-xs text-on-surface-variant italic">
+                    Line structure satisfies rhyming rules.
+                  </div>
+                )}
+              </aside>
 
-                    <p className="text-xs text-poetry-muted italic leading-relaxed">
-                      "New poetry: {p.title}. Crafted and analyzed using Devanagari meter algorithms on #PoetryStudio."
-                    </p>
+              {/* Center Column: The Canvas */}
+              <section className="col-span-12 md:col-span-6 flex justify-center">
+                <div className="w-full max-w-[720px] bg-surface-container-lowest border border-outline-variant rounded p-[48px] ambient-shadow min-h-[500px] relative">
+                  <div className="absolute top-4 right-4 flex gap-2 opacity-30">
+                    <span className="material-symbols-outlined text-sm animate-pulse">auto_awesome</span>
+                  </div>
+                  <div className="font-verse-primary text-verse-primary text-primary leading-loose whitespace-pre-wrap">
+                    {editingText}
+                  </div>
+                </div>
+              </section>
 
-                    <div className="flex gap-4 pt-2">
-                      <button 
-                        onClick={() => approveAndPublishStaged(p.id)}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-poetry-bg font-bold text-xs py-2 px-4 rounded-lg flex-1 text-center"
-                      >
-                        Approve Release
-                      </button>
-                      <button 
-                        onClick={() => { setActiveTab("poems"); selectPoem(p.id); }}
-                        className="bg-white/5 border border-poetry-border/15 hover:bg-white/10 text-poetry-muted hover:text-white font-bold text-xs py-2 px-4 rounded-lg flex-1 text-center"
-                      >
-                        Edit Post
-                      </button>
+              {/* Right Column: Audience Agent (Sentiment) */}
+              <aside className="col-span-12 md:col-span-3 space-y-stack-md">
+                <div className="flex items-center gap-2 mb-4 justify-end text-right">
+                  <h3 className="font-label-caps text-label-caps text-on-tertiary-container tracking-widest uppercase font-bold">Audience Agent</h3>
+                  <span className="material-symbols-outlined text-on-tertiary-container" style={{ fontVariationSettings: '"FILL" 1' }}>groups</span>
+                </div>
+
+                {poemDetails?.audience_reviews?.map(review => (
+                  <div key={review.id} className="bg-surface-container-lowest border border-outline-variant p-4 rounded ambient-shadow relative">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-label-caps text-label-caps text-primary font-bold">{review.persona_name}</span>
+                      <span className="bg-tertiary-fixed text-on-tertiary-fixed text-[11px] px-2 py-0.5 rounded font-bold">{review.rating}/10</span>
+                    </div>
+                    <p className="text-xs text-on-surface mb-3">{review.suggestion}</p>
+                    <div className="flex items-center justify-between text-[11px] text-on-surface-variant font-label-caps">
+                      <span>Valence: <strong>{review.final_emotion}</strong></span>
                     </div>
                   </div>
                 ))}
-              </div>
+              </aside>
+
             </div>
-          )}
+          </div>
+        )}
 
-          {/* TAB 4: EVENT AUDIT TRAIL VIEW */}
-          {activeTab === "logs" && (
-            <div className="space-y-6">
-              <div className="border-b border-poetry-border/20 pb-2">
-                <h4 className="text-lg font-bold text-white">Event Log Audit Trails</h4>
-                <p className="text-xs text-poetry-muted">Under-the-hood trace of database transactions, background pipelines and agent actions.</p>
-              </div>
-
-              <div className="glass rounded-xl overflow-hidden border border-poetry-border/30">
-                <div className="bg-poetry-darker/60 border-b border-poetry-border/30 p-3 text-xs text-poetry-muted grid grid-cols-12 font-bold uppercase tracking-wider">
-                  <div className="col-span-3">Timestamp</div>
-                  <div className="col-span-3">Event Name</div>
-                  <div className="col-span-6">Payload Summary</div>
-                </div>
-                <div className="divide-y divide-poetry-border/15 max-h-[500px] overflow-y-auto">
-                  {(poemDetails?.events || logs).map((evt, idx) => (
-                    <div key={idx} className="p-3 text-xs grid grid-cols-12 hover:bg-white/5 transition-all text-poetry-text font-mono">
-                      <div className="col-span-3 text-poetry-muted">{new Date(evt.emitted_at || new Date()).toLocaleString()}</div>
-                      <div className="col-span-3 text-poetry-accent font-semibold">{evt.event_name}</div>
-                      <div className="col-span-6 text-poetry-muted truncate">{JSON.stringify(evt.payload_json || { status: "logged" })}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-        </div>
       </main>
+
+      {/* Footer */}
+      <footer className="bg-surface-container-low w-full py-stack-lg px-container-padding-desktop flex flex-col md:flex-row justify-between items-center gap-base border-t border-outline-variant mt-auto">
+        <div className="font-headline-lg text-headline-lg text-primary tracking-tight">PoetryStudio</div>
+        <div className="flex flex-wrap justify-center gap-base">
+          <button className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors">Guidelines</button>
+          <button className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors">About Us</button>
+          <button className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors">Privacy</button>
+          <button className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors">Terms</button>
+        </div>
+        <div className="font-label-caps text-label-caps text-on-surface text-center md:text-right">
+          © 2026 PoetryStudio. Crafted for the modern wordsmith.
+        </div>
+      </footer>
+
     </div>
   );
 }

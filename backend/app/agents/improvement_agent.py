@@ -7,6 +7,21 @@ logger = logging.getLogger("poetrystudio.improvement_agent")
 
 PROMPTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../prompts"))
 
+def clean_json_response(content: str) -> str:
+    content = content.strip()
+    if content.startswith("```"):
+        lines = content.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        content = "\n".join(lines).strip()
+    first_brace = content.find("{")
+    last_brace = content.rfind("}")
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        content = content[first_brace:last_brace+1]
+    return content
+
 def run_improvement_agent(original_text: str) -> dict:
     """
     Runs the LLM with the editor improvement prompt.
@@ -57,7 +72,7 @@ def run_improvement_agent(original_text: str) -> dict:
     
     try:
         response = llm.invoke(prompt)
-        suggestions = json.loads(response.content.strip())
+        suggestions = json.loads(clean_json_response(response.content))
         return suggestions
     except Exception as e:
         logger.error(f"Error in ImprovementAgent: {e}")
