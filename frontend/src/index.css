@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  background-color: #fbf9f4; /* surface background */
+  color: #1b1c19; /* on-surface */
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+}
+
+/* Focused environment layout transition */
+.sidebar-transition {
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body.focus-mode .sidebar-transition {
+  opacity: 0 !important;
+  transform: translateX(-50px);
+  pointer-events: none;
+}
+
+body.focus-mode .sidebar-transition-right {
+  opacity: 0 !important;
+  transform: translateX(50px);
+  pointer-events: none;
+}
+
+body.focus-mode .top-nav-transition {
+  opacity: 0 !important;
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+
+/* Ambient shadow on lifting paper sheet */
+.ambient-shadow {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ambient-shadow:hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e4e2dd;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c4c7c7;
+}
+
+/* Diff viewer styles */
+.diff-added {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #065f46;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+.diff-removed {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #991b1b;
+  text-decoration: line-through;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+.diff-info {
+  color: #1e3a8a;
+  font-weight: 500;
+}
+
+/* Blinking editor cursor simulation */
+.editor-cursor {
+  border-left: 2px solid #1f6868; /* secondary */
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink {
+  50% { border-color: transparent; }
+}
