@@ -10,6 +10,7 @@ export default {
         // Stitch design system colors
         background: "#fbf9f4",
         primary: "#000000",
+        "on-primary": "#ffffff",
         secondary: "#1f6868",
         tertiary: "#000000",
         "on-surface-variant": "#444748",

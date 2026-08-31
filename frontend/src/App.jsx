@@ -66,6 +66,7 @@ export default function App() {
   const [poemDetails, setPoemDetails] = useState(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [editingText, setEditingText] = useState("");
+  const [showTranslation, setShowTranslation] = useState(false);
   
   // Pipeline Loading Status for Keep Import
   const [importing, setImporting] = useState(false);
@@ -218,6 +219,7 @@ export default function App() {
   const loadMockState = () => {
     setIsBackendOnline(false);
     setPoems(CLIENT_MOCK_POEMS);
+    setShowTranslation(false);
     if (CLIENT_MOCK_POEMS.length > 0) {
       const defaultPoem = CLIENT_MOCK_POEMS[0];
       setSelectedPoemId(defaultPoem.id);
@@ -254,6 +256,7 @@ export default function App() {
     if (!poemId) return;
     setSelectedPoemId(poemId);
     setSuggestions([]);
+    setShowTranslation(false);
     
     const poem = poemList.find(p => p.id === poemId);
     if (poem) {
@@ -644,7 +647,7 @@ export default function App() {
     <div className="bg-background text-on-background font-body-md text-body-md antialiased min-h-screen flex flex-col selection:bg-tertiary-fixed selection:text-on-tertiary-fixed">
       
       {/* Top Navigation Shell */}
-      <nav className="bg-background fixed top-0 w-full z-50 flex justify-between items-center px-container-padding-desktop max-w-7xl mx-auto border-b border-outline-variant h-20 top-nav-transition sidebar-transition">
+      <nav className="fixed top-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-7xl z-50 flex justify-between items-center px-6 md:px-12 bg-surface-container-lowest/70 backdrop-blur-md border border-outline-variant/60 h-16 rounded-full shadow-lg top-nav-transition sidebar-transition">
         <div className="flex items-center gap-base">
           <span 
             className="font-headline-lg text-headline-lg font-bold text-primary cursor-pointer"
@@ -1003,24 +1006,64 @@ export default function App() {
                     </p>
                     <div className="w-8 h-[1px] bg-outline-variant"></div>
                   </div>
+
+                  {/* Hindi Translation Toggle */}
+                  <div className="mt-8 flex bg-surface-container-high p-1 rounded-full border border-outline-variant select-none">
+                    <button
+                      className={`px-4 py-1.5 rounded-full text-xs font-label-caps tracking-wider transition-all duration-300 ${
+                        !showTranslation 
+                          ? "bg-primary text-on-primary shadow-sm" 
+                          : "text-on-surface-variant hover:text-primary"
+                      }`}
+                      onClick={() => setShowTranslation(false)}
+                    >
+                      Original
+                    </button>
+                    <button
+                      className={`px-4 py-1.5 rounded-full text-xs font-label-caps tracking-wider transition-all duration-300 ${
+                        showTranslation 
+                          ? "bg-primary text-on-primary shadow-sm" 
+                          : "text-on-surface-variant hover:text-primary"
+                      }`}
+                      onClick={() => setShowTranslation(true)}
+                    >
+                      Hindi Translation
+                    </button>
+                  </div>
                 </header>
 
                 {/* Poem Body */}
                 <div className="font-verse-primary text-verse-primary text-on-surface whitespace-pre-wrap max-w-prose text-left mx-auto leading-loose selection:bg-tertiary-fixed selection:text-on-tertiary-fixed">
-                  {editingText || "This poem is empty."}
+                  {showTranslation 
+                    ? (poemDetails?.translations?.find(t => t.language.includes("Hindi"))?.content || 
+                       "Hindi translation is not available yet. Please open this poem in 'Kaagaz' to trigger translation.")
+                    : (editingText || "This poem is empty.")
+                  }
                 </div>
 
-                <div className="mt-20 border-t border-outline-variant pt-6 w-full flex justify-center gap-4">
+                <div className="mt-20 border-t border-outline-variant pt-6 w-full flex justify-center items-center gap-6">
                   <button 
-                    className="flex items-center gap-2 text-xs font-label-caps text-secondary hover:underline"
+                    className="flex items-center gap-2 text-xs font-label-caps text-secondary hover:text-primary transition-colors"
                     onClick={() => {
                       selectPoem(selectedPoemId); // fetch exact current draft poem values
                       setFocusMode(false);
                       setActiveTab("kaagaz");
                     }}
                   >
-                    <span className="material-symbols-outlined text-sm">edit</span>
+                    <span className="material-symbols-outlined text-[18px]">edit</span>
                     Edit Poem
+                  </button>
+
+                  <div className="w-[1px] h-4 bg-outline-variant"></div>
+
+                  <button 
+                    className="flex items-center gap-2 bg-primary text-on-primary hover:opacity-90 transition-opacity px-5 py-2.5 rounded-full text-xs font-label-caps uppercase tracking-wider shadow-md"
+                    onClick={() => {
+                      setActiveTab("review");
+                    }}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                    Analyze & Post
                   </button>
                 </div>
               </article>
