@@ -6,9 +6,9 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage, AIMessage
 from langchain_core.outputs import ChatResult, ChatGeneration
 
-# Try importing ChatLiteLLM, catch if dependencies are still installing
+# Direct litellm import for robust provider support (Gemini, OpenAI, Groq, etc.)
 try:
-    from langchain_community.chat_models import ChatLiteLLM
+    import litellm
     HAS_LITELLM = True
 except ImportError:
     HAS_LITELLM = False
@@ -27,17 +27,39 @@ class MockChatModel(BaseChatModel):
         # Combine message texts to inspect the prompt content
         full_text = "\n".join([m.content for m in messages])
         
-        # 1. Extract poem text from the prompt to make responses dynamic and validated
-        poem_lines = []
-        for line in full_text.splitlines():
-            l_strip = line.strip()
-            # Exclude instructions, roles, system prefixes, or templates
-            if l_strip and not any(x in l_strip.lower() for x in [
-                "translate", "prompt", "role:", "persona:", "system:", "user:", 
-                "instructions:", "output json", "original_text", "line_text", "target_matra"
-            ]):
-                poem_lines.append(l_strip)
-                
+        # 1. Extract poem text cleanly without prompt instructions or meta lines
+        poem_text = ""
+        lower_full = full_text.lower()
+        if "review the following poem:" in lower_full:
+            parts = full_text.split("Review the following poem:", 1)
+            after = parts[1]
+            for stop_phrase in ["Provide your feedback", "Output a structured JSON", "Review the following", "Provide your review", "Output:"]:
+                if stop_phrase.lower() in after.lower():
+                    idx = after.lower().find(stop_phrase.lower())
+                    after = after[:idx]
+            poem_text = after.strip()
+        elif "original poem:" in lower_full:
+            parts = full_text.split("Original Poem:", 1)
+            after = parts[1]
+            for stop_phrase in ["Rules:", "Output a structured JSON", "Output:", "Provide your feedback"]:
+                if stop_phrase.lower() in after.lower():
+                    idx = after.lower().find(stop_phrase.lower())
+                    after = after[:idx]
+            poem_text = after.strip()
+
+        poem_lines = [l.strip() for l in poem_text.splitlines() if l.strip()] if poem_text else []
+        if not poem_lines:
+            for line in full_text.splitlines():
+                l_strip = line.strip()
+                if l_strip and not any(x in l_strip.lower() for x in [
+                    "you are a", "review the", "provide your", "output a", "rules:", "keys:", 
+                    "translate", "prompt", "role:", "persona:", "system:", "user:", 
+                    "instructions:", "output json", "original_text", "line_text", "target_matra",
+                    "{", "}", "rating", "strengths", "weaknesses", "suggestion", "favorite_line",
+                    "confusing_line", "final_emotion", "//", "only output", "actionable_enhancements"
+                ]):
+                    poem_lines.append(l_strip)
+
         # Fallbacks if no poem text is parsed
         if not poem_lines:
             poem_lines = [
@@ -289,151 +311,286 @@ class MockChatModel(BaseChatModel):
             response_text = json.dumps(response_json, indent=2)
 
         # 4. Audience Romantic Lover Check
-        elif "romantic poetry lover" in full_text.lower():
+        elif "romantic" in full_text.lower():
             if theme == "romantic":
                 rating = 9
+                appeal_score = 9
+                engagement_score = 9
                 strengths = ["Captures the tender nuances of intimacy", "Genuine romantic vulnerability", "Beautiful, classic couplet imagery"]
-                weaknesses = ["Could focus even more on the sensory detail of the touch"]
+                weaknesses = ["Could focus even more on the sensory detail of touch and presence"]
                 suggestion = f"Highlight the deep emotional pull of: '{first_line}'"
+                actionable_enhancements = [
+                    f"Amplify sensory touch and warmth around '{first_line}' to intensify intimacy.",
+                    f"In '{second_line}', contrast emotional longing with the physical presence of the beloved.",
+                    "Use evocative olfactory or tactile metaphors (fragrance of hair, warmth of breath) rather than abstract feelings."
+                ]
                 final_emotion = "Deep, passionate longing (Ishq-e-Haqiqi)"
             elif theme == "sadness":
                 rating = 8
+                appeal_score = 8
+                engagement_score = 9
                 strengths = ["Conveys profound heartache and separation", "Touches the core of tragic love", "Sincere, raw pain"]
                 weaknesses = ["The sadness feels a bit heavy-handed in the second half"]
-                suggestion = f"Try balancing the grief in the line '{second_line}' with a memory of love."
+                suggestion = f"Try balancing the grief in the line '{second_line}' with a fleeting memory of love."
+                actionable_enhancements = [
+                    f"Anchor the sorrow in '{first_line}' with a tangible symbol of lost love (an unsent letter, cold teacup).",
+                    f"Subtly soften '{second_line}' to create an aching nostalgia rather than bleak despair.",
+                    "Give the reader an emotional release or breath between tragic couplets."
+                ]
                 final_emotion = "Tragic melancholy and separation (Dard-e-Hijr)"
             elif theme == "motivation":
                 rating = 7
+                appeal_score = 7
+                engagement_score = 8
                 strengths = ["Energetic rhythmic drive", "Upbeat feeling of victory and self-worth"]
                 weaknesses = ["Lacks the traditional romantic subtext standard readers look for"]
                 suggestion = f"Inject a subtle romantic metaphor to soften the stance of: '{first_line}'"
+                actionable_enhancements = [
+                    f"Frame the journey in '{first_line}' as a devotion to an ideal or beloved goal.",
+                    "Soften the fierce cadence with warm, empathetic language.",
+                    "Connect personal victory with universal love and human connection."
+                ]
                 final_emotion = "Optimistic desire and longing"
             elif theme == "friendship":
                 rating = 8
+                appeal_score = 8
+                engagement_score = 8
                 strengths = ["Warm portrayal of companionship", "Relatable nostalgia of old shared moments"]
                 weaknesses = ["Vibe is more platonic than romantic"]
                 suggestion = f"Focus on the platonic romanticism of old friends in the line: '{second_line}'"
+                actionable_enhancements = [
+                    f"Deepen the nostalgia in '{second_line}' by recalling a specific shared laughter or silence.",
+                    "Weave companionship into a lifelong anchor against the world's harshness.",
+                    "Heighten emotional resonance by honoring the unspoken bonds between souls."
+                ]
                 final_emotion = "Brotherly affection and platonic warmth"
             elif theme == "nature":
                 rating = 8
+                appeal_score = 8
+                engagement_score = 8
                 strengths = ["Lush natural metaphors", "Evocative atmospheric description"]
                 weaknesses = ["Metaphors sometimes overshadow the personal connection"]
                 suggestion = f"Use the nature motif in '{first_line}' to directly mirror human feelings."
+                actionable_enhancements = [
+                    f"Directly link the landscape in '{first_line}' to an internal heartbeat or yearning.",
+                    f"In '{second_line}', have the natural world respond to the speaker's emotional state.",
+                    "Include intimate sensory details (dew on fingertips, breeze on skin) to connect earth with emotion."
+                ]
                 final_emotion = "Serene, peaceful admiration"
             else:
                 rating = 8
+                appeal_score = 8
+                engagement_score = 8
                 strengths = ["Flowing poetic cadence", "Vulnerable atmosphere"]
                 weaknesses = ["The flow is slightly interrupted at the line transition"]
                 suggestion = f"Enhance the emotional clarity of the line: '{first_line}'"
+                actionable_enhancements = [
+                    f"Clarify the emotional intent of '{first_line}' so the reader feels it instantly.",
+                    f"Smooth the transition into '{second_line}' for seamless emotional buildup.",
+                    "Replace abstract declarations with vivid, heartfelt moments."
+                ]
                 final_emotion = "Contemplative interest"
 
             response_json = {
                 "rating": rating,
+                "appeal_score": appeal_score,
+                "engagement_score": engagement_score,
                 "strengths": strengths,
                 "weaknesses": weaknesses,
                 "favorite_line": first_line,
                 "confusing_line": None,
                 "suggestion": suggestion,
+                "actionable_enhancements": actionable_enhancements,
                 "final_emotion": final_emotion
             }
             response_text = json.dumps(response_json, indent=2)
 
         # 5. Audience Critic Check
-        elif "literary critic" in full_text.lower():
+        elif "critic" in full_text.lower():
             if theme == "romantic":
                 rating = 8
+                appeal_score = 8
+                engagement_score = 9
                 strengths = ["Delicate ghazal-style lyricism", "Phonetic harmony in rhymes"]
                 weaknesses = ["The rhyme scheme is slightly conventional"]
                 suggestion = f"Experiment with rare rhymes (Qafia) around '{second_line}' to stand out from classical templates."
+                actionable_enhancements = [
+                    f"Replace standard rhyme words around '{second_line}' with fresher, unexpected lexical choices.",
+                    "Sharpen metaphorical imagery so the trope doesn't settle into predictable cliché.",
+                    "Ensure meter count (Matra / Bahr) remains consistent across both lines of the couplet."
+                ]
                 final_emotion = "Aesthetic appreciation"
             elif theme == "sadness":
                 rating = 9
+                appeal_score = 9
+                engagement_score = 9
                 strengths = ["Excellent usage of melancholy as a structural anchor", "Powerful tragic metaphors"]
                 weaknesses = ["Line length fluctuates, impacting the classical rhythm slightly"]
                 suggestion = f"Tighten the syllable counts in the line '{second_line}' to preserve the slow, solemn pace of the grief."
+                actionable_enhancements = [
+                    f"Measure syllable weights in '{second_line}' to keep a steady, mournful cadence.",
+                    "Avoid over-explaining the sadness; let the concrete imagery carry the emotional weight.",
+                    "Use enjambment deliberately to mirror the pause of an actual sob or sigh."
+                ]
                 final_emotion = "Somber contemplation"
             elif theme == "motivation":
                 rating = 8
+                appeal_score = 8
+                engagement_score = 8
                 strengths = ["Strong assertive tone", "Bold, declarative cadence"]
                 weaknesses = ["Uses slightly didactic language rather than imagery"]
                 suggestion = f"Use active physical metaphors in '{second_line}' instead of abstract concepts to improve impact."
+                actionable_enhancements = [
+                    f"Substitute abstract virtues in '{second_line}' with kinetic, physical actions (climbing, forging, burning).",
+                    "Elevate diction with classical Urdu/Hindi roots to give lines timeless weight.",
+                    "Cut filler syllables to produce a punchy, aphoristic climax."
+                ]
                 final_emotion = "Resolute focus"
             elif theme == "friendship":
                 rating = 7
+                appeal_score = 7
+                engagement_score = 8
                 strengths = ["Colloquial ease and natural storytelling rhythm", "Approachable diction"]
                 weaknesses = ["Stops short of complex literary layers"]
                 suggestion = f"Consider using elevated word choices for friends and gather places in '{second_line}'."
+                actionable_enhancements = [
+                    f"Infuse '{second_line}' with classical terms of fellowship (Yaraan, Mehfil, Hamnawa).",
+                    "Introduce subtext that hints at the passage of time testing friendships.",
+                    "Balance the casual tone with at least one striking, memorable poetic image."
+                ]
                 final_emotion = "Nostalgic validation"
             elif theme == "nature":
                 rating = 9
+                appeal_score = 9
+                engagement_score = 9
                 strengths = ["Vivid sensory imagery", "Strong environmental setting"]
                 weaknesses = ["Lacks a clear philosophical anchor in the second couplet"]
                 suggestion = f"Tie the environmental description in '{first_line}' with a deeper human reflection in '{second_line}'."
+                actionable_enhancements = [
+                    f"Bridge external landscape in '{first_line}' with an internal existential contemplation in '{second_line}'.",
+                    "Employ subtle phonetic alliteration or internal assonance to mimic natural elements (wind, water).",
+                    "Prune excess descriptive adjectives in favor of vivid nouns."
+                ]
                 final_emotion = "Intellectual curiosity"
             else:
                 rating = 8
+                appeal_score = 8
+                engagement_score = 8
                 strengths = ["Strong structural stability", "Good phonetic cadence"]
                 weaknesses = ["Transitions between lines could be smoother"]
                 suggestion = f"Adjust the line break structure of '{second_line}' to balance reading pace."
+                actionable_enhancements = [
+                    f"Refine the break after '{first_line}' so the suspense pulls the reader directly into '{second_line}'.",
+                    "Test each line under metrical recitation to eliminate awkward tongue-twisters.",
+                    "Elevate word choices to enhance poetic resonance and memorability."
+                ]
                 final_emotion = "Balanced interest"
 
             response_json = {
                 "rating": rating,
+                "appeal_score": appeal_score,
+                "engagement_score": engagement_score,
                 "strengths": strengths,
                 "weaknesses": weaknesses,
                 "favorite_line": first_line,
-                "confusing_line": second_line,
+                "confusing_line": second_line if second_line != first_line else None,
                 "suggestion": suggestion,
+                "actionable_enhancements": actionable_enhancements,
                 "final_emotion": final_emotion
             }
             response_text = json.dumps(response_json, indent=2)
 
         # 6. Audience Instagrammer Check
-        elif "instagram reader" in full_text.lower():
+        elif "instagram" in full_text.lower():
             if theme == "romantic":
                 rating = 9
+                appeal_score = 10
+                engagement_score = 9
                 strengths = ["Highly shareable couplet aesthetic", "Relatable emotional hook"]
                 weaknesses = ["The font spacing in the preview will need custom styling for alignment"]
                 suggestion = f"This couplet starting with '{first_line}' will go viral if paired with a minimalist dark layout."
+                actionable_enhancements = [
+                    f"Make '{first_line}' punchier as a 1-second scroll-stopping visual hook.",
+                    f"Format '{second_line}' as a standalone quote card for high bookmark and share rates.",
+                    "Add an evocative one-word caption prompt that invites comments."
+                ]
                 final_emotion = "Aesthetic romance and cozy vibes"
             elif theme == "sadness":
                 rating = 9
+                appeal_score = 9
+                engagement_score = 10
                 strengths = ["Hits right in the feels", "Perfect length for caption quotes"]
                 weaknesses = ["Could use a bit more contrast in the imagery"]
                 suggestion = f"Line '{first_line}' is a perfect quote block for a rain/night visual theme."
+                actionable_enhancements = [
+                    f"Turn '{first_line}' into the primary hook header with bold typography.",
+                    f"Let '{second_line}' resonate as an unresolved whisper to spark deep comments and shares.",
+                    "Pair with moody ambient audio or minimalist rain aesthetics."
+                ]
                 final_emotion = "Bittersweet longing and heartbreak"
             elif theme == "motivation":
                 rating = 9
+                appeal_score = 9
+                engagement_score = 9
                 strengths = ["Powerful status/caption material", "Extremely motivational tone"]
                 weaknesses = ["Slightly long for a single slide preview card"]
                 suggestion = f"Highlight '{first_line}' as the bold header and let the rest sit as paragraph text."
+                actionable_enhancements = [
+                    f"Distill '{first_line}' into a razor-sharp mantra for morning motivation stories.",
+                    f"Position '{second_line}' as the call-to-action or self-belief punchline.",
+                    "Use high-contrast bold typography on a matte black canvas."
+                ]
                 final_emotion = "Empowered and focused vibes"
             elif theme == "friendship":
                 rating = 8
+                appeal_score = 9
+                engagement_score = 8
                 strengths = ["Relatable shared memories", "Perfect to tag best friends under"]
                 weaknesses = ["Visual theme needs to be warmer/casual"]
                 suggestion = f"Ideal couplet to post as an appreciation story tag."
+                actionable_enhancements = [
+                    f"Craft '{first_line}' so readers immediately think of someone to send it to via DM.",
+                    "Keep the wording colloquial and deeply relatable rather than overly complex.",
+                    "Use polaroid or golden-hour aesthetic templates for sharing."
+                ]
                 final_emotion = "Casual and warm friendly vibes"
             elif theme == "nature":
                 rating = 8
+                appeal_score = 9
+                engagement_score = 8
                 strengths = ["Scenic visual aesthetics", "Perfect for atmospheric background images"]
-                weaknesses = ["Text needs to be centered carefully to not overlap the background landscape details"]
+                weaknesses = ["Text needs to be centered carefully to not overlap landscape details"]
                 suggestion = f"Overlay the line '{first_line}' over a misty nature shot to maximize aesthetic value."
+                actionable_enhancements = [
+                    f"Feature '{first_line}' as an overlay quote on serene drone footage or mist photos.",
+                    "Keep lines short so they don't crowd the visual imagery on mobile screens.",
+                    "Incorporate serene nature soundbites when publishing as reel or story."
+                ]
                 final_emotion = "Calm and earthy aesthetics"
             else:
                 rating = 8
+                appeal_score = 8
+                engagement_score = 8
                 strengths = ["Aesthetic couplet pacing", "Quoteable lines"]
                 weaknesses = ["Could use a slightly punchier hook line"]
                 suggestion = f"Format '{first_line}' in a bold serif typography style."
+                actionable_enhancements = [
+                    f"Front-load the most striking phrase of '{first_line}' into the opening 3 words.",
+                    "Use generous line spacing to give the text visual elegance.",
+                    "Include a memorable closing flourish that readers will want to repost."
+                ]
                 final_emotion = "Classic and minimalist aesthetic"
 
             response_json = {
                 "rating": rating,
+                "appeal_score": appeal_score,
+                "engagement_score": engagement_score,
                 "strengths": strengths,
                 "weaknesses": weaknesses,
                 "favorite_line": first_line,
                 "confusing_line": None,
                 "suggestion": suggestion,
+                "actionable_enhancements": actionable_enhancements,
                 "final_emotion": final_emotion
             }
             response_text = json.dumps(response_json, indent=2)
@@ -489,23 +646,75 @@ class MockChatModel(BaseChatModel):
     def _llm_type(self) -> str:
         return "mock-chat-model"
 
-def get_llm_model(provider_model: str = "gemini/gemini-1.5-flash") -> BaseChatModel:
+class LiteLLMChatModel(BaseChatModel):
+    model_name: str = Field(default="gemini/gemini-2.5-flash")
+    temperature: float = Field(default=0.7)
+
+    def _generate(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        litellm_messages = []
+        for m in messages:
+            role = "user"
+            if m.type in ("human", "user"):
+                role = "user"
+            elif m.type in ("ai", "assistant"):
+                role = "assistant"
+            elif m.type in ("system",):
+                role = "system"
+            litellm_messages.append({"role": role, "content": m.content})
+
+        try:
+            res = litellm.completion(
+                model=self.model_name,
+                messages=litellm_messages,
+                temperature=self.temperature,
+                stop=stop,
+                timeout=10,
+                num_retries=1
+            )
+            content = res.choices[0].message.content or ""
+            return ChatResult(generations=[ChatGeneration(message=AIMessage(content=content))])
+        except Exception as e:
+            import logging
+            logging.getLogger("poetrystudio.llm").warning(f"LiteLLM call failed ({e}), falling back to MockChatModel.")
+            mock = MockChatModel(model_name="fallback-mock")
+            return mock._generate(messages=messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    @property
+    def _llm_type(self) -> str:
+        return "litellm-chat-model"
+
+def get_llm_model(provider_model: Optional[str] = None) -> BaseChatModel:
     """
     Returns a unified LangChain chat model.
-    Routes to LiteLLM if USE_MOCK_LLM is false/unset and API keys exist.
+    Routes to LiteLLMChatModel if USE_MOCK_LLM is false/unset and API keys exist.
     Falls back to MockChatModel for zero-config operation.
     """
-    use_mock = os.getenv("USE_MOCK_LLM", "true").lower() == "true"
+    use_mock = os.getenv("USE_MOCK_LLM", "false").lower() == "true"
     
     # Check keys
     gemini_key = os.getenv("GEMINI_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
     groq_key = os.getenv("GROQ_API_KEY")
 
+    if not provider_model:
+        provider_model = os.getenv("DEFAULT_LLM_MODEL")
+        if not provider_model:
+            if gemini_key:
+                provider_model = "gemini/gemini-2.5-flash"
+            elif openai_key:
+                provider_model = "gpt-4o-mini"
+            elif groq_key:
+                provider_model = "groq/llama-3.1-70b-versatile"
+            else:
+                provider_model = "gemini/gemini-2.5-flash"
+
     if not use_mock and HAS_LITELLM and (gemini_key or openai_key or groq_key):
-        try:
-            return ChatLiteLLM(model=provider_model, temperature=0.7)
-        except Exception:
-            return MockChatModel(model_name="fallback-mock")
+        return LiteLLMChatModel(model_name=provider_model, temperature=0.7)
     else:
-        return MockChatModel(model_name=provider_model)
+        return MockChatModel(model_name=provider_model or "mock-model")

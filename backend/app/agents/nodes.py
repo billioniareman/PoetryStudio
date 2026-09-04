@@ -76,47 +76,56 @@ def load_prompt(filename: str) -> str:
             "Only output the raw JSON object. Do not wrap in markdown or add conversational preamble."
         ),
         "audience_romantic.txt": (
-            "You are a passionate Romantic Poetry Lover. You read poetry for its raw emotion and depth of feeling.\n"
+            "You are a passionate Romantic Poetry Lover evaluating emotional pull, intimacy, and engagement.\n"
             "Review the following poem:\n{original_text}\n\n"
             "Output a structured JSON object with these keys:\n"
             "{{\n"
             '  "rating": 8,\n'
-            '  "strengths": ["emotional strengths"],\n'
-            '  "weaknesses": ["emotional weaknesses"],\n'
-            '  "favorite_line": "favorite line",\n'
-            '  "confusing_line": "confusing line or null",\n'
-            '  "suggestion": "how to make emotional impact stronger",\n'
-            '  "final_emotion": "primary emotion"\n'
+            '  "appeal_score": 9,\n'
+            '  "engagement_score": 8,\n'
+            '  "strengths": ["emotional strengths", "tender imagery"],\n'
+            '  "weaknesses": ["where emotion wavers or feels clichéd"],\n'
+            '  "favorite_line": "most emotionally resonant line",\n'
+            '  "confusing_line": "confusing or mood-breaking line or null",\n'
+            '  "suggestion": "how to deepen emotional connection with the audience",\n'
+            '  "actionable_enhancements": ["concrete steps to heighten romantic appeal and reader engagement"],\n'
+            '  "final_emotion": "primary emotion left with reader"\n'
             "}}\n"
             "Only output the raw JSON object. Do not wrap in markdown or add conversational preamble."
         ),
         "audience_critic.txt": (
-            "You are a rigorous, academic Literary Critic looking for imagery, structure, and craft.\n"
+            "You are a rigorous Literary Critic analyzing craft, meter, imagery, and structural engagement.\n"
             "Review the following poem:\n{original_text}\n\n"
             "Output a structured JSON object with these keys:\n"
             "{{\n"
-            '  "rating": 7,\n'
-            '  "strengths": ["craft/imagery strengths"],\n'
-            '  "weaknesses": ["structural/cliche flaws"],\n'
-            '  "favorite_line": "best crafted line",\n'
-            '  "confusing_line": "problematic line or null",\n'
-            '  "suggestion": "how to refine structure/imagery",\n'
-            '  "final_emotion": "craftsmanship impression"\n'
+            '  "rating": 8,\n'
+            '  "appeal_score": 8,\n'
+            '  "engagement_score": 8,\n'
+            '  "strengths": ["structural or figurative craft achievements"],\n'
+            '  "weaknesses": ["clichés or metric flaws reducing engagement"],\n'
+            '  "favorite_line": "line with the best craftsmanship",\n'
+            '  "confusing_line": "line with rhythmic stumble or cliché or null",\n'
+            '  "suggestion": "concise guidance on core artistic elevation",\n'
+            '  "actionable_enhancements": ["concrete craft edits to heighten aesthetic appeal and intellectual engagement"],\n'
+            '  "final_emotion": "craftsmanship impression left behind"\n'
             "}}\n"
             "Only output the raw JSON object. Do not wrap in markdown or add conversational preamble."
         ),
         "audience_instagram.txt": (
-            "You are a modern Instagram Reader looking for catchy hooks and high shareability.\n"
+            "You are a modern Instagram Reader seeking viral appeal, scroll-stopping hooks, and shareable lines.\n"
             "Review the following poem:\n{original_text}\n\n"
             "Output a structured JSON object with these keys:\n"
             "{{\n"
             '  "rating": 9,\n'
-            '  "strengths": ["reasons why it is relatable/catchy"],\n'
-            '  "weaknesses": ["reasons why reader might scroll past"],\n'
-            '  "favorite_line": "most quoteable line/couplet",\n'
-            '  "confusing_line": "archaic or slow reading line or null",\n'
-            '  "suggestion": "how to improve hook/visual layout",\n'
-            '  "final_emotion": "vibe/mood projects"\n'
+            '  "appeal_score": 9,\n'
+            '  "engagement_score": 9,\n'
+            '  "strengths": ["reasons why someone would save or share this"],\n'
+            '  "weaknesses": ["reasons why a reader might scroll past"],\n'
+            '  "favorite_line": "most quoteable or screenshot-worthy line/couplet",\n'
+            '  "confusing_line": "slow reading or archaic line or null",\n'
+            '  "suggestion": "how to optimize the hook and punchline for social platforms",\n'
+            '  "actionable_enhancements": ["concrete tips to maximize viral appeal and modern audience engagement"],\n'
+            '  "final_emotion": "the vibe or mood projected"\n'
             "}}\n"
             "Only output the raw JSON object. Do not wrap in markdown or add conversational preamble."
         )
@@ -413,27 +422,50 @@ def audience_romantic_node(state: PoetryStudioState, config: RunnableConfig = No
     
     prompt = load_prompt("audience_romantic.txt").format(original_text=original_text)
     
-    review_data = {"rating": 5, "strengths": [], "weaknesses": [], "favorite_line": "", "confusing_line": "", "suggestion": "", "final_emotion": ""}
+    review_data = {
+        "rating": 7,
+        "appeal_score": 8,
+        "engagement_score": 7,
+        "strengths": [],
+        "weaknesses": [],
+        "favorite_line": "",
+        "confusing_line": "",
+        "suggestion": "",
+        "actionable_enhancements": [],
+        "final_emotion": ""
+    }
     try:
         res = llm.invoke(prompt)
         review_data = json.loads(clean_json_response(res.content))
     except Exception as e:
         logger.error(f"Romantic reviewer parsing error: {e}")
         
+    rating = int(review_data.get("rating", 7))
+    appeal_score = int(review_data.get("appeal_score", rating))
+    engagement_score = int(review_data.get("engagement_score", rating))
+    actionable_enhancements = review_data.get("actionable_enhancements", [])
+
     review_repo.save_review(
         poem_id=poem_id,
         persona_name="Romantic Lover",
-        rating=review_data["rating"],
-        strengths=review_data["strengths"],
-        weaknesses=review_data["weaknesses"],
-        favorite_line=review_data["favorite_line"],
+        rating=rating,
+        appeal_score=appeal_score,
+        engagement_score=engagement_score,
+        strengths=review_data.get("strengths", []),
+        weaknesses=review_data.get("weaknesses", []),
+        favorite_line=review_data.get("favorite_line", ""),
         confusing_line=review_data.get("confusing_line"),
-        suggestion=review_data["suggestion"],
-        final_emotion=review_data["final_emotion"]
+        suggestion=review_data.get("suggestion", ""),
+        actionable_enhancements=actionable_enhancements,
+        final_emotion=review_data.get("final_emotion", "Yearning")
     )
     
     log_repo.log_agent_call(poem_id, "AudienceAgent_Romantic", {}, review_data)
     review_data["persona_name"] = "Romantic Lover"
+    review_data["rating"] = rating
+    review_data["appeal_score"] = appeal_score
+    review_data["engagement_score"] = engagement_score
+    review_data["actionable_enhancements"] = actionable_enhancements
     return {"reviews": [review_data]}
 
 def audience_critic_node(state: PoetryStudioState, config: RunnableConfig = None) -> Dict[str, Any]:
@@ -447,27 +479,50 @@ def audience_critic_node(state: PoetryStudioState, config: RunnableConfig = None
     
     prompt = load_prompt("audience_critic.txt").format(original_text=original_text)
     
-    review_data = {"rating": 5, "strengths": [], "weaknesses": [], "favorite_line": "", "confusing_line": "", "suggestion": "", "final_emotion": ""}
+    review_data = {
+        "rating": 7,
+        "appeal_score": 7,
+        "engagement_score": 7,
+        "strengths": [],
+        "weaknesses": [],
+        "favorite_line": "",
+        "confusing_line": "",
+        "suggestion": "",
+        "actionable_enhancements": [],
+        "final_emotion": ""
+    }
     try:
         res = llm.invoke(prompt)
         review_data = json.loads(clean_json_response(res.content))
     except Exception as e:
         logger.error(f"Critic reviewer parsing error: {e}")
         
+    rating = int(review_data.get("rating", 7))
+    appeal_score = int(review_data.get("appeal_score", rating))
+    engagement_score = int(review_data.get("engagement_score", rating))
+    actionable_enhancements = review_data.get("actionable_enhancements", [])
+
     review_repo.save_review(
         poem_id=poem_id,
         persona_name="Literary Critic",
-        rating=review_data["rating"],
-        strengths=review_data["strengths"],
-        weaknesses=review_data["weaknesses"],
-        favorite_line=review_data["favorite_line"],
+        rating=rating,
+        appeal_score=appeal_score,
+        engagement_score=engagement_score,
+        strengths=review_data.get("strengths", []),
+        weaknesses=review_data.get("weaknesses", []),
+        favorite_line=review_data.get("favorite_line", ""),
         confusing_line=review_data.get("confusing_line"),
-        suggestion=review_data["suggestion"],
-        final_emotion=review_data["final_emotion"]
+        suggestion=review_data.get("suggestion", ""),
+        actionable_enhancements=actionable_enhancements,
+        final_emotion=review_data.get("final_emotion", "Appreciation")
     )
     
     log_repo.log_agent_call(poem_id, "AudienceAgent_Critic", {}, review_data)
     review_data["persona_name"] = "Literary Critic"
+    review_data["rating"] = rating
+    review_data["appeal_score"] = appeal_score
+    review_data["engagement_score"] = engagement_score
+    review_data["actionable_enhancements"] = actionable_enhancements
     return {"reviews": [review_data]}
 
 def audience_instagrammer_node(state: PoetryStudioState, config: RunnableConfig = None) -> Dict[str, Any]:
@@ -481,82 +536,124 @@ def audience_instagrammer_node(state: PoetryStudioState, config: RunnableConfig 
     
     prompt = load_prompt("audience_instagram.txt").format(original_text=original_text)
     
-    review_data = {"rating": 5, "strengths": [], "weaknesses": [], "favorite_line": "", "confusing_line": "", "suggestion": "", "final_emotion": ""}
+    review_data = {
+        "rating": 8,
+        "appeal_score": 9,
+        "engagement_score": 8,
+        "strengths": [],
+        "weaknesses": [],
+        "favorite_line": "",
+        "confusing_line": "",
+        "suggestion": "",
+        "actionable_enhancements": [],
+        "final_emotion": ""
+    }
     try:
         res = llm.invoke(prompt)
         review_data = json.loads(clean_json_response(res.content))
     except Exception as e:
         logger.error(f"Instagrammer reviewer parsing error: {e}")
         
+    rating = int(review_data.get("rating", 8))
+    appeal_score = int(review_data.get("appeal_score", rating))
+    engagement_score = int(review_data.get("engagement_score", rating))
+    actionable_enhancements = review_data.get("actionable_enhancements", [])
+
     review_repo.save_review(
         poem_id=poem_id,
         persona_name="Instagram Reader",
-        rating=review_data["rating"],
-        strengths=review_data["strengths"],
-        weaknesses=review_data["weaknesses"],
-        favorite_line=review_data["favorite_line"],
+        rating=rating,
+        appeal_score=appeal_score,
+        engagement_score=engagement_score,
+        strengths=review_data.get("strengths", []),
+        weaknesses=review_data.get("weaknesses", []),
+        favorite_line=review_data.get("favorite_line", ""),
         confusing_line=review_data.get("confusing_line"),
-        suggestion=review_data["suggestion"],
-        final_emotion=review_data["final_emotion"]
+        suggestion=review_data.get("suggestion", ""),
+        actionable_enhancements=actionable_enhancements,
+        final_emotion=review_data.get("final_emotion", "Aesthetic Vibe")
     )
     
     log_repo.log_agent_call(poem_id, "AudienceAgent_Instagram", {}, review_data)
     review_data["persona_name"] = "Instagram Reader"
+    review_data["rating"] = rating
+    review_data["appeal_score"] = appeal_score
+    review_data["engagement_score"] = engagement_score
+    review_data["actionable_enhancements"] = actionable_enhancements
     return {"reviews": [review_data]}
 
 def aggregator_node(state: PoetryStudioState, config: RunnableConfig = None) -> Dict[str, Any]:
     """Combines all persona reviews into a single consolidated summary review."""
     db = config["configurable"]["db"]
     poem_id = state["poem_id"]
-    reviews = state["reviews"]
+    reviews = state.get("reviews", [])
     
     review_repo = ReviewRepository(db)
     log_repo = LogRepository(db)
     
-    ratings = [r["rating"] for r in reviews]
+    ratings = [r.get("rating", 7) for r in reviews if isinstance(r, dict)]
     avg_rating = int(round(sum(ratings) / len(ratings))) if ratings else 0
+
+    appeal_scores = [r.get("appeal_score", r.get("rating", 7)) for r in reviews if isinstance(r, dict)]
+    avg_appeal = int(round(sum(appeal_scores) / len(appeal_scores))) if appeal_scores else avg_rating
+
+    engagement_scores = [r.get("engagement_score", r.get("rating", 7)) for r in reviews if isinstance(r, dict)]
+    avg_engagement = int(round(sum(engagement_scores) / len(engagement_scores))) if engagement_scores else avg_rating
     
     strengths = []
     weaknesses = []
     suggestions = []
+    actionable_enhancements = []
     emotions = []
     
     for r in reviews:
+        if not isinstance(r, dict):
+            continue
         strengths.extend(r.get("strengths", []))
         weaknesses.extend(r.get("weaknesses", []))
-        suggestions.append(f"{r['persona_name']}: {r.get('suggestion')}")
-        emotions.append(r.get("final_emotion"))
+        if r.get("suggestion"):
+            suggestions.append(f"{r.get('persona_name', 'Audience')}: {r.get('suggestion')}")
+        actionable_enhancements.extend(r.get("actionable_enhancements", []))
+        if r.get("final_emotion"):
+            emotions.append(r.get("final_emotion"))
 
     # De-duplicate
-    strengths = list(set(strengths))[:5]
-    weaknesses = list(set(weaknesses))[:5]
+    strengths = list(dict.fromkeys(strengths))[:5]
+    weaknesses = list(dict.fromkeys(weaknesses))[:5]
+    actionable_enhancements = list(dict.fromkeys(actionable_enhancements))[:6]
     final_suggestion = " | ".join(suggestions)
-    consensus_emotion = emotions[0] if emotions else "Mixed"
+    consensus_emotion = emotions[0] if emotions else "Resonant"
 
     aggregated_review = review_repo.save_review(
         poem_id=poem_id,
         persona_name="Aggregator",
         rating=avg_rating,
+        appeal_score=avg_appeal,
+        engagement_score=avg_engagement,
         strengths=strengths,
         weaknesses=weaknesses,
         favorite_line=reviews[0].get("favorite_line") if reviews else "",
         confusing_line=reviews[0].get("confusing_line") if reviews else None,
         suggestion=final_suggestion,
+        actionable_enhancements=actionable_enhancements,
         final_emotion=consensus_emotion
     )
 
-    log_repo.log_agent_call(poem_id, "ReviewAggregator", {"reviews_count": len(reviews)}, {"average_rating": avg_rating})
-    emit_event(db, "audience.reviewed", poem_id, {"avg_rating": avg_rating})
+    log_repo.log_agent_call(poem_id, "ReviewAggregator", {"reviews_count": len(reviews)}, {"average_rating": avg_rating, "appeal": avg_appeal, "engagement": avg_engagement})
+    emit_event(db, "audience.reviewed", poem_id, {"avg_rating": avg_rating, "appeal_score": avg_appeal, "engagement_score": avg_engagement})
 
     return {
         "aggregate_review": {
             "rating": avg_rating,
+            "appeal_score": avg_appeal,
+            "engagement_score": avg_engagement,
             "strengths": strengths,
             "weaknesses": weaknesses,
             "suggestion": final_suggestion,
+            "actionable_enhancements": actionable_enhancements,
             "final_emotion": consensus_emotion
         },
-        "logs": state.get("logs", []) + [f"ReviewAggregator combined {len(reviews)} reviews. Average: {avg_rating}/10"]
+        "logs": state.get("logs", []) + [f"ReviewAggregator combined {len(reviews)} reviews. Average: {avg_rating}/10 (Appeal: {avg_appeal}/10, Engagement: {avg_engagement}/10)"]
     }
 
 def design_node(state: PoetryStudioState, config: RunnableConfig = None) -> Dict[str, Any]:

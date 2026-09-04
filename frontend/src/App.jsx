@@ -80,6 +80,46 @@ export default function App() {
   // Auto-save & AI status feedback messages
   const [saveStatus, setSaveStatus] = useState("Saved");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isEvaluatingAudience, setIsEvaluatingAudience] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState("translation"); // translation, audience
+  const [audienceFilter, setAudienceFilter] = useState("all"); // all, romantic, critic, instagram, aggregator
+
+  const getPersonaConfig = (personaName) => {
+    const name = (personaName || "").toLowerCase();
+    if (name.includes("romantic")) {
+      return {
+        icon: "favorite",
+        cardBorder: "border-l-4 border-l-rose-500",
+        badgeBg: "bg-rose-50 text-rose-700 border border-rose-200",
+        accent: "text-rose-600",
+        label: "Romantic Lover"
+      };
+    } else if (name.includes("critic")) {
+      return {
+        icon: "menu_book",
+        cardBorder: "border-l-4 border-l-indigo-500",
+        badgeBg: "bg-indigo-50 text-indigo-700 border border-indigo-200",
+        accent: "text-indigo-600",
+        label: "Literary Critic"
+      };
+    } else if (name.includes("instagram")) {
+      return {
+        icon: "share",
+        cardBorder: "border-l-4 border-l-purple-500",
+        badgeBg: "bg-purple-50 text-purple-700 border border-purple-200",
+        accent: "text-purple-600",
+        label: "Instagram Reader"
+      };
+    } else {
+      return {
+        icon: "auto_awesome",
+        cardBorder: "border-l-4 border-l-amber-500",
+        badgeBg: "bg-amber-50 text-amber-800 border border-amber-200",
+        accent: "text-amber-600",
+        label: "Consensus Aggregator"
+      };
+    }
+  };
 
   // Check backend server health on mount
   useEffect(() => {
@@ -353,9 +393,78 @@ export default function App() {
         matra_counts_json: matras
       },
       audience_reviews: [
-        { id: 1, persona_name: "Romantic Lover", rating: 9, strengths_json: ["Emotionally vulnerable", "Beautiful word choices"], weaknesses_json: ["Rhythm slows in line 2"], favorite_line: lines[0] || "No text", confusing_line: null, suggestion: "Focus on deepening the imagery in: '" + (lines[0] || "") + "'", final_emotion: "Yearning (Ishq)" },
-        { id: 2, persona_name: "Literary Critic", rating: 8, strengths_json: ["Classical format", "Avoids clichés"], weaknesses_json: ["Conventional metaphors"], favorite_line: lines[0] || "No text", confusing_line: lines[1] || null, suggestion: "Refine word choices in '" + (lines[1] || "") + "' to raise depth.", final_emotion: "Appreciation" },
-        { id: 3, persona_name: "Instagram Reader", rating: 9, strengths_json: ["Extremely shareable couplets", "Captivating aesthetic"], weaknesses_json: ["A bit dense for rapid scrolling"], favorite_line: lines[0] || "No text", confusing_line: null, suggestion: "Share the main couplet: '" + (lines[0] || "") + "' directly.", final_emotion: "Aesthetic Vibe" }
+        { 
+          id: 1, 
+          persona_name: "Romantic Lover", 
+          rating: 9, 
+          appeal_score: 9,
+          engagement_score: 9,
+          strengths_json: ["Emotionally vulnerable confession", "Beautiful, tender word choices"], 
+          weaknesses_json: ["Rhythm softens slightly at the couplet transition"], 
+          favorite_line: lines[0] || "No text", 
+          confusing_line: null, 
+          suggestion: "Deepen the sensory intimacy and emotional contrast in: '" + (lines[0] || "") + "'", 
+          actionable_enhancements_json: [
+            "Amplify tactile sensory details (warmth, breath, touch) around the opening line.",
+            "Contrast lingering longing with the physical presence of the beloved.",
+            "Let couplets breathe for a more tender, unforgettable afterglow."
+          ],
+          final_emotion: "Yearning (Ishq-e-Haqiqi)" 
+        },
+        { 
+          id: 2, 
+          persona_name: "Literary Critic", 
+          rating: 8, 
+          appeal_score: 8,
+          engagement_score: 8,
+          strengths_json: ["Lyrical ghazal cadence", "Avoids tired romantic clichés"], 
+          weaknesses_json: ["Rhyme scheme leans slightly conventional in line 2"], 
+          favorite_line: lines[0] || "No text", 
+          confusing_line: lines[1] || null, 
+          suggestion: "Refine word choices in '" + (lines[1] || "") + "' to elevate technical craftsmanship.", 
+          actionable_enhancements_json: [
+            "Substitute predictable end-rhymes with fresher, unexpected lexical terms.",
+            "Tighten metric syllable weights across both lines for classical symmetry.",
+            "Let the central metaphor carry deeper philosophical subtext."
+          ],
+          final_emotion: "Aesthetic Appreciation" 
+        },
+        { 
+          id: 3, 
+          persona_name: "Instagram Reader", 
+          rating: 9, 
+          appeal_score: 10,
+          engagement_score: 9,
+          strengths_json: ["High screenshot and save appeal", "Relatable quote aesthetic"], 
+          weaknesses_json: ["Line 2 could be slightly punchier for rapid mobile reading"], 
+          favorite_line: lines[0] || "No text", 
+          confusing_line: null, 
+          suggestion: "Feature the opening couplet '" + (lines[0] || "") + "' as a high-contrast quote card.", 
+          actionable_enhancements_json: [
+            "Make line 1 punchier as an instant 2-second scroll-stopping hook.",
+            "Deliver a memorable mic-drop punchline in the final couplet.",
+            "Pair with dark, minimalist aesthetics and mood ambient audio."
+          ],
+          final_emotion: "Aesthetic Romance & Cozy Vibes" 
+        },
+        {
+          id: 4,
+          persona_name: "Aggregator",
+          rating: 9,
+          appeal_score: 9,
+          engagement_score: 9,
+          strengths_json: ["Lyrical ghazal cadence", "High screenshot and save appeal", "Emotionally vulnerable confession"],
+          weaknesses_json: ["Rhythm softens slightly at the couplet break", "Line 2 could be slightly punchier"],
+          favorite_line: lines[0] || "No text",
+          confusing_line: null,
+          suggestion: "Harmonize classical depth with punchy modern delivery for maximum audience reach.",
+          actionable_enhancements_json: [
+            "Anchor romantic vulnerability with concrete, tangible imagery.",
+            "Maintain tight metric flow while preserving conversational intimacy.",
+            "Structure the couplets for both deep contemplative reading and visual social sharing."
+          ],
+          final_emotion: "Consensus: Resonant Longing"
+        }
       ],
       generated_media: [
         { id: 1, template_name: "Dark", media_url: "placeholder_dark.png" },
@@ -470,6 +579,37 @@ export default function App() {
       setSaveStatus("Failed");
     }
     setIsAnalyzing(false);
+  };
+
+  // Run fast Audience evaluation on the active poem
+  const runAudienceEvaluation = async () => {
+    if (!selectedPoemId) return;
+    setIsEvaluatingAudience(true);
+    setSaveStatus("Audience evaluating...");
+
+    if (!isBackendOnline) {
+      await new Promise(r => setTimeout(r, 600));
+      const poem = poems.find(p => p.id === selectedPoemId);
+      if (poem) {
+        setPoemDetails(generateLocalMockDetails(poem));
+      }
+      setSaveStatus("Audience Reviewed");
+      setIsEvaluatingAudience(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/poems/${selectedPoemId}/audience-review`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setPoemDetails(data);
+        setSaveStatus("Audience Reviewed");
+      }
+    } catch (e) {
+      console.error("Audience review failed", e);
+      setSaveStatus("Review Failed");
+    }
+    setIsEvaluatingAudience(false);
   };
 
   // Handles fast local updates on typing
@@ -936,23 +1076,101 @@ export default function App() {
               </div>
             </section>
 
-            {/* Right Sidebar: Translation */}
+            {/* Right Sidebar: Dual Tab (Translation & Audience Insights) */}
             <aside className="w-1/3 py-8 sidebar-transition sidebar-transition-right hidden lg:flex flex-col gap-stack-sm">
-              <div className="border-b border-outline-variant pb-2">
-                <h2 className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Live Translation</h2>
+              <div className="flex items-center justify-between border-b border-outline-variant pb-2">
+                <div className="flex gap-2">
+                  <button 
+                    className={`font-label-caps text-label-caps uppercase tracking-wider px-3 py-1 rounded transition-colors ${sidebarTab === "translation" ? "bg-primary text-on-primary font-bold shadow-xs" : "text-on-surface-variant hover:text-primary"}`}
+                    onClick={() => setSidebarTab("translation")}
+                  >
+                    Live Translation
+                  </button>
+                  <button 
+                    className={`font-label-caps text-label-caps uppercase tracking-wider px-3 py-1 rounded transition-colors flex items-center gap-1 ${sidebarTab === "audience" ? "bg-secondary text-on-secondary font-bold shadow-xs" : "text-on-surface-variant hover:text-secondary"}`}
+                    onClick={() => setSidebarTab("audience")}
+                  >
+                    <span className="material-symbols-outlined text-[14px]">groups</span>
+                    Audience Feedback
+                  </button>
+                </div>
               </div>
-              <div className="flex-grow bg-surface-container-low rounded-lg p-8 border border-outline-variant shadow-sm flex flex-col justify-between">
-                <div className="space-y-4">
-                  <p className="font-label-caps text-[11px] text-secondary uppercase tracking-widest font-bold">Hindi & Hinglish Render</p>
-                  <div className="font-verse-primary text-verse-primary text-on-surface-variant whitespace-pre-wrap leading-loose italic max-h-[400px] overflow-y-auto">
-                    {poemDetails?.translations?.find(t => t.language.includes("Hindi"))?.content || 
-                     (editingText ? "अनुवाद लोड हो रहा है..." : "लेखन शुरू करें...")}
+
+              {sidebarTab === "translation" ? (
+                <div className="flex-grow bg-surface-container-low rounded-lg p-6 border border-outline-variant shadow-sm flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <p className="font-label-caps text-[11px] text-secondary uppercase tracking-widest font-bold">Hindi & Hinglish Render</p>
+                    <div className="font-verse-primary text-verse-primary text-on-surface-variant whitespace-pre-wrap leading-loose italic max-h-[400px] overflow-y-auto">
+                      {poemDetails?.translations?.find(t => t.language.includes("Hindi"))?.content || 
+                       (editingText ? "अनुवाद लोड हो रहा है..." : "लेखन शुरू करें...")}
+                    </div>
+                  </div>
+                  <div className="border-t border-outline-variant pt-4 text-xs text-outline italic">
+                    Translation updates dynamically as you type.
                   </div>
                 </div>
-                <div className="border-t border-outline-variant pt-4 text-xs text-outline italic">
-                  Translation updates dynamically as you type.
+              ) : (
+                <div className="flex-grow bg-surface-container-low rounded-lg p-6 border border-outline-variant shadow-sm flex flex-col justify-between overflow-hidden">
+                  <div className="space-y-4 overflow-y-auto max-h-[500px] pr-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-caps text-[11px] text-primary uppercase tracking-widest font-bold">Audience Insights</span>
+                      <button 
+                        className="text-[11px] font-label-caps text-secondary hover:underline flex items-center gap-1 disabled:opacity-50"
+                        onClick={runAudienceEvaluation}
+                        disabled={isEvaluatingAudience || (!editingText && !editingTitle)}
+                      >
+                        <span className={`material-symbols-outlined text-[13px] ${isEvaluatingAudience ? "animate-spin" : ""}`}>refresh</span>
+                        {isEvaluatingAudience ? "Evaluating..." : "Re-evaluate"}
+                      </button>
+                    </div>
+
+                    {poemDetails?.audience_reviews && poemDetails.audience_reviews.length > 0 ? (
+                      poemDetails.audience_reviews.slice(0, 3).map(rev => {
+                        const cfg = getPersonaConfig(rev.persona_name);
+                        const enhancements = rev.actionable_enhancements_json || rev.actionable_enhancements || [];
+                        return (
+                          <div key={rev.id} className={`bg-surface-container-lowest p-4 rounded border border-outline-variant ${cfg.cardBorder} shadow-xs space-y-2`}>
+                            <div className="flex justify-between items-center">
+                              <span className="font-label-caps text-xs font-bold text-primary flex items-center gap-1">
+                                <span className={`material-symbols-outlined text-sm ${cfg.accent}`}>{cfg.icon}</span>
+                                {rev.persona_name}
+                              </span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${cfg.badgeBg}`}>{rev.rating}/10</span>
+                            </div>
+                            <p className="text-xs text-on-surface italic">"{rev.suggestion}"</p>
+                            {enhancements.length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-outline-variant/50">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1 mb-1">
+                                  <span className="material-symbols-outlined text-[12px]">tips_and_updates</span>
+                                  Enhance Appeal & Engagement:
+                                </span>
+                                <ul className="text-[11px] text-on-surface-variant space-y-1 pl-3 list-disc">
+                                  {enhancements.slice(0, 2).map((enh, eIdx) => (
+                                    <li key={eIdx}>{enh}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-8 text-on-surface-variant text-xs italic">
+                        No reviews yet. Click "Run AI Critique" or Re-evaluate to get audience feedback.
+                      </div>
+                    )}
+                  </div>
+                  <div className="border-t border-outline-variant pt-3 flex justify-between items-center text-xs">
+                    <span className="text-[11px] text-outline">Targeted audience feedback</span>
+                    <button 
+                      className="font-label-caps text-[11px] text-primary hover:underline font-bold"
+                      onClick={() => setActiveTab("review")}
+                    >
+                      Full Report →
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </aside>
           </div>
         )}
@@ -1186,25 +1404,173 @@ export default function App() {
                 </div>
               </section>
 
-              {/* Right Column: Audience Agent (Sentiment) */}
-              <aside className="col-span-12 md:col-span-3 space-y-stack-md">
-                <div className="flex items-center gap-2 mb-4 justify-end text-right">
-                  <h3 className="font-label-caps text-label-caps text-on-tertiary-container tracking-widest uppercase font-bold">Audience Agent</h3>
-                  <span className="material-symbols-outlined text-on-tertiary-container" style={{ fontVariationSettings: '"FILL" 1' }}>groups</span>
-                </div>
-
-                {poemDetails?.audience_reviews?.map(review => (
-                  <div key={review.id} className="bg-surface-container-lowest border border-outline-variant p-4 rounded ambient-shadow relative">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-label-caps text-label-caps text-primary font-bold">{review.persona_name}</span>
-                      <span className="bg-tertiary-fixed text-on-tertiary-fixed text-[11px] px-2 py-0.5 rounded font-bold">{review.rating}/10</span>
-                    </div>
-                    <p className="text-xs text-on-surface mb-3">{review.suggestion}</p>
-                    <div className="flex items-center justify-between text-[11px] text-on-surface-variant font-label-caps">
-                      <span>Valence: <strong>{review.final_emotion}</strong></span>
+              {/* Right Column: Audience Agent (Sentiment, Appeal & Engagement) */}
+              <aside className="col-span-12 md:col-span-4 space-y-stack-md">
+                <div className="flex items-center justify-between mb-3 border-b border-outline-variant pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-on-tertiary-container" style={{ fontVariationSettings: '"FILL" 1' }}>groups</span>
+                    <div>
+                      <h3 className="font-label-caps text-label-caps text-on-tertiary-container tracking-widest uppercase font-bold">Audience Agent</h3>
+                      <p className="text-[10px] text-on-surface-variant">Perception, Appeal & Engagement</p>
                     </div>
                   </div>
-                ))}
+                  <button 
+                    className="flex items-center gap-1 bg-surface-container-high hover:bg-surface-container-highest text-primary text-[11px] font-label-caps uppercase px-3 py-1.5 rounded transition-all shadow-xs disabled:opacity-50"
+                    onClick={runAudienceEvaluation}
+                    disabled={isEvaluatingAudience || (!editingText && !editingTitle)}
+                    title="Re-run Audience Agent on this poem"
+                  >
+                    <span className={`material-symbols-outlined text-[14px] ${isEvaluatingAudience ? "animate-spin text-secondary" : ""}`}>refresh</span>
+                    <span>{isEvaluatingAudience ? "Evaluating..." : "Re-evaluate"}</span>
+                  </button>
+                </div>
+
+                {/* Persona Filter Pills */}
+                <div className="flex flex-wrap gap-1.5 pb-2">
+                  {["all", "romantic", "critic", "instagram", "aggregator"].map(flt => (
+                    <button
+                      key={flt}
+                      onClick={() => setAudienceFilter(flt)}
+                      className={`text-[10px] uppercase font-label-caps px-2.5 py-1 rounded-full transition-all ${
+                        audienceFilter === flt
+                          ? "bg-primary text-on-primary font-bold shadow-xs"
+                          : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-primary"
+                      }`}
+                    >
+                      {flt === "all" ? "All Reviews" : flt === "aggregator" ? "Consensus" : flt}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Reviews List */}
+                <div className="space-y-4">
+                  {poemDetails?.audience_reviews
+                    ?.filter(review => {
+                      if (audienceFilter === "all") return true;
+                      const name = (review.persona_name || "").toLowerCase();
+                      if (audienceFilter === "romantic") return name.includes("romantic");
+                      if (audienceFilter === "critic") return name.includes("critic");
+                      if (audienceFilter === "instagram") return name.includes("instagram");
+                      if (audienceFilter === "aggregator") return name.includes("aggregator");
+                      return true;
+                    })
+                    .map(review => {
+                      const cfg = getPersonaConfig(review.persona_name);
+                      const strengths = review.strengths_json || review.strengths || [];
+                      const weaknesses = review.weaknesses_json || review.weaknesses || [];
+                      const enhancements = review.actionable_enhancements_json || review.actionable_enhancements || [];
+                      const appeal = review.appeal_score || review.rating;
+                      const engagement = review.engagement_score || review.rating;
+
+                      return (
+                        <div key={review.id} className={`bg-surface-container-lowest border border-outline-variant p-4 rounded-lg ambient-shadow relative ${cfg.cardBorder} transition-all hover:shadow-md space-y-3`}>
+                          
+                          {/* Header with Avatar, Name, and Scores */}
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-2">
+                              <span className={`p-1.5 rounded-full ${cfg.badgeBg} flex items-center justify-center`}>
+                                <span className="material-symbols-outlined text-[16px]">{cfg.icon}</span>
+                              </span>
+                              <div>
+                                <span className="font-label-caps text-xs font-bold text-primary block leading-tight">{review.persona_name}</span>
+                                <span className="text-[10px] text-on-surface-variant font-label-caps">{review.final_emotion}</span>
+                              </div>
+                            </div>
+
+                            {/* Ratings badges */}
+                            <div className="flex flex-col items-end gap-1">
+                              <span className={`text-xs px-2.5 py-0.5 rounded font-bold ${cfg.badgeBg}`}>
+                                {review.rating}/10
+                              </span>
+                              <div className="flex gap-2 text-[10px] font-mono text-on-surface-variant">
+                                <span title="Appeal Score" className="flex items-center gap-0.5">
+                                  <span className="material-symbols-outlined text-[11px] text-amber-500">star</span>
+                                  {appeal}
+                                </span>
+                                <span title="Engagement Score" className="flex items-center gap-0.5">
+                                  <span className="material-symbols-outlined text-[11px] text-emerald-500">bolt</span>
+                                  {engagement}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Core Suggestion */}
+                          <div className="bg-surface-container-low p-3 rounded text-xs text-on-surface leading-relaxed italic border border-outline-variant/60">
+                            "{review.suggestion}"
+                          </div>
+
+                          {/* Favorite Line Callout */}
+                          {review.favorite_line && (
+                            <div className="p-2.5 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 rounded text-[11px]">
+                              <span className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1 mb-0.5">
+                                <span className="material-symbols-outlined text-[13px]">grade</span>
+                                Favorite Line
+                              </span>
+                              <p className="italic text-on-surface line-clamp-2">"{review.favorite_line}"</p>
+                            </div>
+                          )}
+
+                          {/* Confusing / Stumble Line Callout */}
+                          {review.confusing_line && (
+                            <div className="p-2.5 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded text-[11px]">
+                              <span className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1 mb-0.5">
+                                <span className="material-symbols-outlined text-[13px]">report_problem</span>
+                                Line Breaking Engagement
+                              </span>
+                              <p className="italic text-on-surface line-clamp-2">"{review.confusing_line}"</p>
+                            </div>
+                          )}
+
+                          {/* Strengths Tags */}
+                          {strengths.length > 0 && (
+                            <div>
+                              <span className="text-[10px] uppercase tracking-wider font-bold text-on-surface-variant block mb-1">Strengths</span>
+                              <div className="flex flex-wrap gap-1">
+                                {strengths.map((str, sIdx) => (
+                                  <span key={sIdx} className="bg-emerald-100/70 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                                    <span className="material-symbols-outlined text-[10px]">check</span>
+                                    {str}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Weaknesses Tags */}
+                          {weaknesses.length > 0 && (
+                            <div>
+                              <span className="text-[10px] uppercase tracking-wider font-bold text-on-surface-variant block mb-1">Room for Growth</span>
+                              <div className="flex flex-wrap gap-1">
+                                {weaknesses.map((w, wIdx) => (
+                                  <span key={wIdx} className="bg-amber-100/70 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                                    <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
+                                    {w}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* What to Enhance for Greater Appeal & Engagement */}
+                          {enhancements.length > 0 && (
+                            <div className="bg-primary-container/15 border border-primary/20 rounded p-3 space-y-1.5 mt-2">
+                              <div className="flex items-center gap-1 text-[11px] font-bold text-primary uppercase tracking-wide">
+                                <span className="material-symbols-outlined text-[14px]">auto_fix_high</span>
+                                <span>How to Enhance Appeal & Engagement:</span>
+                              </div>
+                              <ul className="space-y-1 text-xs text-on-surface leading-normal pl-3 list-disc">
+                                {enhancements.map((enh, eIdx) => (
+                                  <li key={eIdx} className="font-body-md text-[11px]">{enh}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                        </div>
+                      );
+                    })}
+                </div>
               </aside>
 
             </div>

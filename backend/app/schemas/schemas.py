@@ -62,11 +62,14 @@ class AudienceReviewResponse(BaseModel):
     poem_id: int
     persona_name: str
     rating: int
+    appeal_score: Optional[int] = None
+    engagement_score: Optional[int] = None
     strengths_json: Optional[List[str]] = None
     weaknesses_json: Optional[List[str]] = None
     favorite_line: Optional[str] = None
     confusing_line: Optional[str] = None
     suggestion: Optional[str] = None
+    actionable_enhancements_json: Optional[List[str]] = None
     final_emotion: Optional[str] = None
     created_at: datetime
 

@@ -184,6 +184,53 @@ class PoemService:
             logger.error(f"Re-analysis failed for poem {poem_id}: {e}")
             return None
 
+    def trigger_audience_review(self, poem_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Runs audience evaluation nodes specifically (Romantic, Critic, Instagram, Aggregator)
+        without executing heavy media generation or publishing steps.
+        """
+        poem = self.poem_repo.get_by_id(poem_id)
+        if not poem:
+            return None
+
+        from ..agents.nodes import (
+            audience_romantic_node,
+            audience_critic_node,
+            audience_instagrammer_node,
+            aggregator_node
+        )
+
+        config = {"configurable": {"db": self.db}}
+        state = {
+            "poem_id": poem.id,
+            "title": poem.title,
+            "original_text": poem.original_text,
+            "language": poem.language,
+            "source": poem.source,
+            "google_keep_id": poem.google_keep_id,
+            "translations": {},
+            "meter_analysis": {},
+            "reviews": [],
+            "aggregate_review": {},
+            "image_paths": [],
+            "publish_status": {},
+            "logs": []
+        }
+
+        try:
+            r1 = audience_romantic_node(state, config)
+            state["reviews"] = state["reviews"] + r1.get("reviews", [])
+            r2 = audience_critic_node(state, config)
+            state["reviews"] = state["reviews"] + r2.get("reviews", [])
+            r3 = audience_instagrammer_node(state, config)
+            state["reviews"] = state["reviews"] + r3.get("reviews", [])
+            agg = aggregator_node(state, config)
+            state["aggregate_review"] = agg.get("aggregate_review", {})
+            return self.get_poem_details(poem_id)
+        except Exception as e:
+            logger.error(f"Audience review failed for poem {poem_id}: {e}")
+            return None
+
     def get_editor_improvements(self, poem_id: int) -> dict:
         poem = self.poem_repo.get_by_id(poem_id)
         if not poem:

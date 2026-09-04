@@ -89,11 +89,14 @@ class AudienceReview(Base):
     poem_id = Column(Integer, ForeignKey("poems.id", ondelete="CASCADE"), nullable=False)
     persona_name = Column(String, nullable=False)  # Romantic, Critic, Instagrammer, Aggregated
     rating = Column(Integer, nullable=False)
+    appeal_score = Column(Integer, nullable=True)
+    engagement_score = Column(Integer, nullable=True)
     strengths_json = Column(JSON, nullable=True)
     weaknesses_json = Column(JSON, nullable=True)
     favorite_line = Column(Text, nullable=True)
     confusing_line = Column(Text, nullable=True)
     suggestion = Column(Text, nullable=True)
+    actionable_enhancements_json = Column(JSON, nullable=True)
     final_emotion = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

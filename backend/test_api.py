@@ -18,11 +18,13 @@ def test_health_check():
     assert response.json()["status"] == "healthy"
 
 from unittest.mock import patch
+import time
 
 def test_poems_endpoints():
+    unique_id = f"test_poem_{int(time.time() * 1000)}"
     test_notes = [
         {
-            "google_keep_id": "test_poem_1",
+            "google_keep_id": unique_id,
             "title": "रात और चाँद",
             "text": "चाँदनी रात में बहती हुई ठंडी हवा,\nमुस्कुराहट तेरी सब कुछ बदल देती है।\nख़ामोश खड़े हैं रास्ते और पेड़ यहाँ,\nदिल की धड़कन आज कुछ नया कहती है।",
             "language": "Hindi",
@@ -71,6 +73,13 @@ def test_poems_endpoints():
     imp_response = client.get(f"/poems/{poem_id}/improvements")
     assert imp_response.status_code == 200
     assert "suggestions" in imp_response.json()
+
+    # 7. Test POST audience-review
+    aud_response = client.post(f"/poems/{poem_id}/audience-review")
+    assert aud_response.status_code == 200
+    aud_data = aud_response.json()
+    assert "audience_reviews" in aud_data
+    assert len(aud_data["audience_reviews"]) >= 3
 
 def test_publishing_endpoints():
     # Get staged posts

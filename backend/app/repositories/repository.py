@@ -116,7 +116,21 @@ class MeterRepository(BaseRepository):
         return self.db.query(models.MeterAnalysis).filter(models.MeterAnalysis.poem_id == poem_id).first()
 
 class ReviewRepository(BaseRepository):
-    def save_review(self, poem_id: int, persona_name: str, rating: int, strengths: list, weaknesses: list, favorite_line: str, confusing_line: str, suggestion: str, final_emotion: str) -> models.AudienceReview:
+    def save_review(
+        self,
+        poem_id: int,
+        persona_name: str,
+        rating: int,
+        strengths: list,
+        weaknesses: list,
+        favorite_line: str,
+        confusing_line: Optional[str],
+        suggestion: str,
+        final_emotion: str,
+        appeal_score: Optional[int] = None,
+        engagement_score: Optional[int] = None,
+        actionable_enhancements: Optional[list] = None
+    ) -> models.AudienceReview:
         # Check if already exists for this persona
         existing = self.db.query(models.AudienceReview)\
             .filter(models.AudienceReview.poem_id == poem_id, models.AudienceReview.persona_name == persona_name)\
@@ -124,11 +138,14 @@ class ReviewRepository(BaseRepository):
 
         if existing:
             existing.rating = rating
+            existing.appeal_score = appeal_score or rating
+            existing.engagement_score = engagement_score or rating
             existing.strengths_json = strengths
             existing.weaknesses_json = weaknesses
             existing.favorite_line = favorite_line
             existing.confusing_line = confusing_line
             existing.suggestion = suggestion
+            existing.actionable_enhancements_json = actionable_enhancements or []
             existing.final_emotion = final_emotion
             self.db.commit()
             self.db.refresh(existing)
@@ -138,11 +155,14 @@ class ReviewRepository(BaseRepository):
                 poem_id=poem_id,
                 persona_name=persona_name,
                 rating=rating,
+                appeal_score=appeal_score or rating,
+                engagement_score=engagement_score or rating,
                 strengths_json=strengths,
                 weaknesses_json=weaknesses,
                 favorite_line=favorite_line,
                 confusing_line=confusing_line,
                 suggestion=suggestion,
+                actionable_enhancements_json=actionable_enhancements or [],
                 final_emotion=final_emotion
             )
             self.db.add(review)

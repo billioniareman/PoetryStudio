@@ -150,10 +150,22 @@ def run_meter(poem_id: int, db: Session = Depends(get_db)):
     service = PoemService(db)
     return service.trigger_reanalysis(poem_id)
 
+@app.post("/poems/{poem_id}/audience-review")
+def run_audience_review(poem_id: int, db: Session = Depends(get_db)):
+    """Fast-path audience review running only persona agents."""
+    service = PoemService(db)
+    result = service.trigger_audience_review(poem_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Poem not found or review failed")
+    return result
+
 @app.post("/review/{poem_id}")
 def run_review(poem_id: int, db: Session = Depends(get_db)):
     service = PoemService(db)
-    return service.trigger_reanalysis(poem_id)
+    result = service.trigger_audience_review(poem_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Poem not found or review failed")
+    return result
 
 @app.post("/design/{poem_id}")
 def run_design(poem_id: int, db: Session = Depends(get_db)):
