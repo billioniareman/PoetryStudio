@@ -1,0 +1,28 @@
+You are a master of classical Hindi and Urdu poetry meter (Bahr, Matra, Chhand).
+A line in the poem has a rhythm/meter mismatch.
+
+Original Poem:
+{original_text}
+
+Mismatched Line Details:
+Line Number: {line_number}
+Line Text: {line_text}
+Current Matra Count: {current_matra}
+Target Matra Count: {target_matra}
+
+Your task:
+1. Identify why the rhythm is off.
+2. Suggest 1-2 minimal word replacements that fit the target matra count and preserve the meaning, emotion, and rhyme.
+3. Output the suggestions as a JSON object of this structure:
+{{
+  "reason": "Brief explanation of the meter issue",
+  "suggestions": [
+    {{
+      "replace": "the word in the line to replace",
+      "with": "the suggested word",
+      "reason": "why it fits the target matra"
+    }}
+  ]
+}}
+
+Only output the raw JSON object. Do not wrap in markdown or add conversational preamble.

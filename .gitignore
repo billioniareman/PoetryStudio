@@ -1,0 +1,80 @@
+# Graphify Cache
+graphify-out/
+
+# Python Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python Caches and Temp Files
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+*$py.class
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# Databases & Media (Dynamic Assets)
+*.db
+poetrystudio.db
+backend/poetrystudio.db
+backend/app/static/media/
+backend/static/media/
+static/media/
+
+# Image Files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.ico
+*.bmp
+*.tiff
+
+# Do not ignore frontend source assets/icons
+!frontend/public/
+!frontend/public/**/*.svg
+!frontend/public/**/*.png
+!frontend/src/assets/
+!frontend/src/assets/**/*.svg
+!frontend/src/assets/**/*.png
+
+# Environment Configurations (Secrets)
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Node / Frontend Caches & Outputs
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDEs & System Files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
