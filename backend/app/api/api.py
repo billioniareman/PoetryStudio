@@ -5,14 +5,14 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import os
 
-from ..core.database import engine, Base, get_db
+from ..core.database import engine, Base, get_db, init_db
 from ..models import models
 from ..schemas import schemas
 from ..services.poem_service import PoemService
 from ..repositories.repository import PublishingRepository, ReviewRepository, MeterRepository
 
-# Create Database tables automatically on startup (SQLite zero-config)
-Base.metadata.create_all(bind=engine)
+# Initialize database and verify schema migrations
+init_db()
 
 app = FastAPI(
     title="Poetry Studio API",

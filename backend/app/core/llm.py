@@ -10,6 +10,8 @@ from langchain_core.outputs import ChatResult, ChatGeneration
 try:
     import litellm
     HAS_LITELLM = True
+    litellm.telemetry = False
+    litellm.suppress_debug_info = True
 except ImportError:
     HAS_LITELLM = False
 
@@ -681,7 +683,11 @@ class LiteLLMChatModel(BaseChatModel):
             return ChatResult(generations=[ChatGeneration(message=AIMessage(content=content))])
         except Exception as e:
             import logging
-            logging.getLogger("poetrystudio.llm").warning(f"LiteLLM call failed ({e}), falling back to MockChatModel.")
+            err_msg = str(e)
+            if "RESOURCE_EXHAUSTED" in err_msg or "RateLimitError" in type(e).__name__ or "429" in err_msg:
+                logging.getLogger("poetrystudio.llm").warning("LLM API Quota Exceeded (429 RateLimit / RESOURCE_EXHAUSTED). Falling back to MockChatModel.")
+            else:
+                logging.getLogger("poetrystudio.llm").warning(f"LiteLLM call failed ({e}), falling back to MockChatModel.")
             mock = MockChatModel(model_name="fallback-mock")
             return mock._generate(messages=messages, stop=stop, run_manager=run_manager, **kwargs)
 

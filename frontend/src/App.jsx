@@ -83,6 +83,7 @@ export default function App() {
   const [isEvaluatingAudience, setIsEvaluatingAudience] = useState(false);
   const [sidebarTab, setSidebarTab] = useState("translation"); // translation, audience
   const [audienceFilter, setAudienceFilter] = useState("all"); // all, romantic, critic, instagram, aggregator
+  const [reviewViewMode, setReviewViewMode] = useState("all"); // all, audience, canvas, meter
 
   const getPersonaConfig = (personaName) => {
     const name = (personaName || "").toLowerCase();
@@ -573,6 +574,8 @@ export default function App() {
         setPoemDetails(data);
         setSaveStatus("Saved & Analyzed");
         setActiveTab("review");
+      } else {
+        setSaveStatus("Analysis Failed");
       }
     } catch (e) {
       console.error(e);
@@ -604,6 +607,8 @@ export default function App() {
         const data = await res.json();
         setPoemDetails(data);
         setSaveStatus("Audience Reviewed");
+      } else {
+        setSaveStatus("Review Failed");
       }
     } catch (e) {
       console.error("Audience review failed", e);
@@ -1291,15 +1296,15 @@ export default function App() {
 
         {/* ==================== 4. AGENT REVIEW VIEW ==================== */}
         {activeTab === "review" && (
-          <div className="flex-grow pt-28 pb-stack-lg px-container-padding-desktop max-w-[1440px] mx-auto w-full">
+          <div className="flex-grow pt-20 lg:pt-24 pb-stack-lg px-4 sm:px-container-padding-desktop max-w-[1440px] mx-auto w-full">
             
             {/* Workspace Header */}
-            <div className="flex justify-between items-end mb-stack-lg border-b border-outline-variant pb-base">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 border-b border-outline-variant pb-base gap-3">
               <div>
                 <h2 className="text-xs font-label-caps text-on-surface-variant tracking-wider uppercase mb-1">
                   AI Review Evidence report
                 </h2>
-                <h1 className="font-display-hero text-display-hero text-primary mb-2 font-bold">
+                <h1 className="font-display-hero text-headline-lg lg:text-display-hero text-primary mb-2 font-bold">
                   {editingTitle}
                 </h1>
                 <div className="flex gap-2">
@@ -1312,7 +1317,7 @@ export default function App() {
                 </div>
               </div>
               
-              <div className="flex gap-stack-sm">
+              <div className="flex gap-stack-sm self-stretch md:self-auto justify-end">
                 <button 
                   className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors px-4 py-2 border border-outline-variant rounded bg-white text-xs font-label-caps shadow-sm"
                   onClick={() => setActiveTab("kaagaz")}
@@ -1330,248 +1335,348 @@ export default function App() {
               </div>
             </div>
 
-            {/* 3-Column Layout */}
-            <div className="grid grid-cols-12 gap-gutter relative">
+            {/* View Mode Switcher & Quick Navigation Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-surface-container-low p-2 rounded-lg border border-outline-variant shadow-xs">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-label-caps text-on-surface-variant font-bold uppercase tracking-wider mr-1 hidden sm:inline">
+                  Layout:
+                </span>
+                <button
+                  onClick={() => setReviewViewMode("all")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-label-caps uppercase tracking-wide transition-all ${
+                    reviewViewMode === "all"
+                      ? "bg-primary text-on-primary font-bold shadow-xs"
+                      : "text-on-surface-variant hover:text-primary hover:bg-surface-container"
+                  }`}
+                  title="View Meter, Canvas, and Audience side-by-side"
+                >
+                  <span className="material-symbols-outlined text-[16px]">view_column</span>
+                  <span>Full 3-Column</span>
+                </button>
+                <button
+                  onClick={() => setReviewViewMode("audience")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-label-caps uppercase tracking-wide transition-all ${
+                    reviewViewMode === "audience"
+                      ? "bg-primary text-on-primary font-bold shadow-xs"
+                      : "text-on-surface-variant hover:text-primary hover:bg-surface-container"
+                  }`}
+                  title="Focus directly on Audience Personas & Recommendations"
+                >
+                  <span className="material-symbols-outlined text-[16px]">groups</span>
+                  <span>Audience Reviews ({poemDetails?.audience_reviews?.length || 0})</span>
+                </button>
+                <button
+                  onClick={() => setReviewViewMode("canvas")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-label-caps uppercase tracking-wide transition-all ${
+                    reviewViewMode === "canvas"
+                      ? "bg-primary text-on-primary font-bold shadow-xs"
+                      : "text-on-surface-variant hover:text-primary hover:bg-surface-container"
+                  }`}
+                  title="Focus on Poem Canvas"
+                >
+                  <span className="material-symbols-outlined text-[16px]">menu_book</span>
+                  <span>Poem Canvas</span>
+                </button>
+                <button
+                  onClick={() => setReviewViewMode("meter")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-label-caps uppercase tracking-wide transition-all ${
+                    reviewViewMode === "meter"
+                      ? "bg-primary text-on-primary font-bold shadow-xs"
+                      : "text-on-surface-variant hover:text-primary hover:bg-surface-container"
+                  }`}
+                  title="Focus on Meter & Matra Analysis"
+                >
+                  <span className="material-symbols-outlined text-[16px]">graphic_eq</span>
+                  <span>Meter Agent</span>
+                </button>
+              </div>
+
+              {/* Quick Jump indicator for mobile & stacked views */}
+              <div className="flex items-center gap-2 text-xs text-on-surface-variant font-label-caps">
+                <span className="text-[11px] text-on-surface-variant hidden xs:inline">Quick Jump:</span>
+                <button 
+                  onClick={() => {
+                    setReviewViewMode("all");
+                    setTimeout(() => {
+                      document.getElementById("audience-agent-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }, 50);
+                  }}
+                  className="text-xs text-primary font-bold hover:text-secondary flex items-center gap-0.5 bg-surface-container px-2.5 py-1 rounded border border-outline-variant/60"
+                >
+                  <span className="material-symbols-outlined text-[14px] text-secondary">groups</span>
+                  <span>Audience Reviews</span>
+                  <span className="material-symbols-outlined text-[14px]">arrow_downward</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Main Layout Grid */}
+            <div className="grid grid-cols-12 gap-gutter relative items-start">
               
               {/* Left Column: Meter Agent (Technical) */}
-              <aside className="col-span-12 md:col-span-3 space-y-stack-md">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: '"FILL" 1' }}>graphic_eq</span>
-                  <h3 className="font-label-caps text-label-caps text-secondary tracking-widest uppercase font-bold">Meter Agent</h3>
-                </div>
+              {(reviewViewMode === "all" || reviewViewMode === "meter") && (
+                <aside className={`${
+                  reviewViewMode === "meter" 
+                    ? "col-span-12 lg:col-span-6" 
+                    : "col-span-12 lg:col-span-3 lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto pr-1"
+                } space-y-stack-md`}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: '"FILL" 1' }}>graphic_eq</span>
+                    <h3 className="font-label-caps text-label-caps text-secondary tracking-widest uppercase font-bold">Meter Agent</h3>
+                  </div>
 
-                <div className="bg-surface-container-lowest border border-outline-variant p-4 rounded ambient-shadow relative space-y-3">
-                  <div className="font-label-caps text-label-caps text-on-surface-variant font-bold">Line-by-Line Syllable Count</div>
-                  
-                  {/* Visually displays the matra count evidence for each line of the selected poem */}
-                  <div className="space-y-2">
-                    {poemDetails?.meter_analysis?.matra_counts_json?.map((m, mIdx) => (
-                      <div key={mIdx} className="flex flex-col gap-1 p-2 bg-surface-container-low rounded border border-outline-variant">
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="truncate max-w-[140px] italic">"{m.line_text}"</span>
-                          <span className="font-bold text-secondary font-mono">{m.matra_count} Matras</span>
+                  <div className="bg-surface-container-lowest border border-outline-variant p-4 rounded ambient-shadow relative space-y-3">
+                    <div className="font-label-caps text-label-caps text-on-surface-variant font-bold">Line-by-Line Syllable Count</div>
+                    
+                    {/* Visually displays the matra count evidence for each line of the selected poem */}
+                    <div className="space-y-2">
+                      {poemDetails?.meter_analysis?.matra_counts_json?.map((m, mIdx) => (
+                        <div key={mIdx} className="flex flex-col gap-1 p-2 bg-surface-container-low rounded border border-outline-variant">
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="truncate max-w-[140px] italic">"{m.line_text}"</span>
+                            <span className="font-bold text-secondary font-mono">{m.matra_count} Matras</span>
+                          </div>
+                          {/* Visual Matra Bar */}
+                          <div className="w-full bg-surface-container-high h-1 rounded-full overflow-hidden">
+                            <div 
+                              className="bg-secondary h-full"
+                              style={{ width: `${Math.min(100, (m.matra_count / 28) * 100)}%` }}
+                            ></div>
+                          </div>
                         </div>
-                        {/* Visual Matra Bar */}
-                        <div className="w-full bg-surface-container-high h-1 rounded-full overflow-hidden">
-                          <div 
-                            className="bg-secondary h-full"
-                            style={{ width: `${Math.min(100, (m.matra_count / 28) * 100)}%` }}
-                          ></div>
-                        </div>
+                      ))}
+                    </div>
+
+                    <div className="border-t border-outline-variant pt-3 flex justify-between items-center text-[11px] text-secondary font-label-caps font-bold">
+                      <span>Base Bahr: {poemDetails?.meter_analysis?.bahr_chhand || "Baseline"}</span>
+                    </div>
+                  </div>
+
+                  {/* Meter Annotation Suggestions */}
+                  {poemDetails?.meter_analysis?.suggestions_json?.length > 0 ? (
+                    poemDetails.meter_analysis.suggestions_json.map((s, idx) => (
+                      <div key={idx} className="bg-surface-container-lowest border border-outline-variant p-4 rounded ambient-shadow relative border-l-4 border-l-secondary">
+                        <div className="font-label-caps text-label-caps text-on-surface-variant mb-1 font-bold">Line {s.line_number} Correction</div>
+                        <p className="text-[11px] text-on-surface mb-3 italic">"{s.line_text}"</p>
+                        <p className="text-xs text-on-surface mb-3 font-semibold text-secondary">{s.reason}</p>
+                        {s.recommendations?.map((rec, rIdx) => (
+                          <button 
+                            key={rIdx}
+                            className="w-full text-left bg-surface-container-low hover:bg-secondary-container/30 border border-outline-variant p-2 rounded text-xs text-primary transition-all font-body-md"
+                            onClick={() => applyMeterSuggestion(s.line_text, editingText.replace(rec.replace, rec.with))}
+                          >
+                            Replace <strong className="line-through text-red-700">{rec.replace}</strong> → <strong className="text-green-700">{rec.with}</strong>
+                          </button>
+                        ))}
                       </div>
+                    ))
+                  ) : (
+                    <div className="bg-surface-container-lowest border border-outline-variant p-4 rounded ambient-shadow text-center text-xs text-on-surface-variant italic">
+                      Line structure satisfies rhyming rules.
+                    </div>
+                  )}
+                </aside>
+              )}
+
+              {/* Center Column: The Canvas */}
+              {(reviewViewMode === "all" || reviewViewMode === "canvas" || reviewViewMode === "audience" || reviewViewMode === "meter") && (
+                <section className={`${
+                  reviewViewMode === "all"
+                    ? "col-span-12 lg:col-span-5 flex justify-center"
+                    : reviewViewMode === "audience"
+                    ? "col-span-12 lg:col-span-4 flex justify-center lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto"
+                    : reviewViewMode === "meter"
+                    ? "col-span-12 lg:col-span-6 flex justify-center lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto"
+                    : "col-span-12 max-w-[760px] mx-auto flex justify-center w-full"
+                }`}>
+                  <div className="w-full max-w-[720px] bg-surface-container-lowest border border-outline-variant rounded p-6 sm:p-8 lg:p-10 ambient-shadow min-h-[400px] relative">
+                    <div className="absolute top-4 right-4 flex gap-2 opacity-30">
+                      <span className="material-symbols-outlined text-sm animate-pulse">auto_awesome</span>
+                    </div>
+                    <div className="font-verse-primary text-verse-primary text-primary leading-loose whitespace-pre-wrap">
+                      {editingText}
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* Right Column: Audience Agent (Sentiment, Appeal & Engagement) */}
+              {(reviewViewMode === "all" || reviewViewMode === "audience") && (
+                <aside 
+                  id="audience-agent-section"
+                  className={`${
+                    reviewViewMode === "audience"
+                      ? "col-span-12 lg:col-span-8"
+                      : "col-span-12 lg:col-span-4 lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto pl-1"
+                  } space-y-stack-md`}
+                >
+                  <div className="flex items-center justify-between mb-3 border-b border-outline-variant pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-on-tertiary-container" style={{ fontVariationSettings: '"FILL" 1' }}>groups</span>
+                      <div>
+                        <h3 className="font-label-caps text-label-caps text-on-tertiary-container tracking-widest uppercase font-bold">Audience Agent</h3>
+                        <p className="text-[10px] text-on-surface-variant">Perception, Appeal & Engagement</p>
+                      </div>
+                    </div>
+                    <button 
+                      className="flex items-center gap-1 bg-surface-container-high hover:bg-surface-container-highest text-primary text-[11px] font-label-caps uppercase px-3 py-1.5 rounded transition-all shadow-xs disabled:opacity-50"
+                      onClick={runAudienceEvaluation}
+                      disabled={isEvaluatingAudience || (!editingText && !editingTitle)}
+                      title="Re-run Audience Agent on this poem"
+                    >
+                      <span className={`material-symbols-outlined text-[14px] ${isEvaluatingAudience ? "animate-spin text-secondary" : ""}`}>refresh</span>
+                      <span>{isEvaluatingAudience ? "Evaluating..." : "Re-evaluate"}</span>
+                    </button>
+                  </div>
+
+                  {/* Persona Filter Pills */}
+                  <div className="flex flex-wrap gap-1.5 pb-2">
+                    {["all", "romantic", "critic", "instagram", "aggregator"].map(flt => (
+                      <button
+                        key={flt}
+                        onClick={() => setAudienceFilter(flt)}
+                        className={`text-[10px] uppercase font-label-caps px-2.5 py-1 rounded-full transition-all ${
+                          audienceFilter === flt
+                            ? "bg-primary text-on-primary font-bold shadow-xs"
+                            : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-primary"
+                        }`}
+                      >
+                        {flt === "all" ? "All Reviews" : flt === "aggregator" ? "Consensus" : flt}
+                      </button>
                     ))}
                   </div>
 
-                  <div className="border-t border-outline-variant pt-3 flex justify-between items-center text-[11px] text-secondary font-label-caps font-bold">
-                    <span>Base Bahr: {poemDetails?.meter_analysis?.bahr_chhand || "Baseline"}</span>
-                  </div>
-                </div>
+                  {/* Reviews List */}
+                  <div className={reviewViewMode === "audience" ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "space-y-4"}>
+                    {poemDetails?.audience_reviews
+                      ?.filter(review => {
+                        if (audienceFilter === "all") return true;
+                        const name = (review.persona_name || "").toLowerCase();
+                        if (audienceFilter === "romantic") return name.includes("romantic");
+                        if (audienceFilter === "critic") return name.includes("critic");
+                        if (audienceFilter === "instagram") return name.includes("instagram");
+                        if (audienceFilter === "aggregator") return name.includes("aggregator");
+                        return true;
+                      })
+                      .map(review => {
+                        const cfg = getPersonaConfig(review.persona_name);
+                        const strengths = review.strengths_json || review.strengths || [];
+                        const weaknesses = review.weaknesses_json || review.weaknesses || [];
+                        const enhancements = review.actionable_enhancements_json || review.actionable_enhancements || [];
+                        const appeal = review.appeal_score || review.rating;
+                        const engagement = review.engagement_score || review.rating;
 
-                {/* Meter Annotation Suggestions */}
-                {poemDetails?.meter_analysis?.suggestions_json?.length > 0 ? (
-                  poemDetails.meter_analysis.suggestions_json.map((s, idx) => (
-                    <div key={idx} className="bg-surface-container-lowest border border-outline-variant p-4 rounded ambient-shadow relative border-l-4 border-l-secondary">
-                      <div className="font-label-caps text-label-caps text-on-surface-variant mb-1 font-bold">Line {s.line_number} Correction</div>
-                      <p className="text-[11px] text-on-surface mb-3 italic">"{s.line_text}"</p>
-                      <p className="text-xs text-on-surface mb-3 font-semibold text-secondary">{s.reason}</p>
-                      {s.recommendations?.map((rec, rIdx) => (
-                        <button 
-                          key={rIdx}
-                          className="w-full text-left bg-surface-container-low hover:bg-secondary-container/30 border border-outline-variant p-2 rounded text-xs text-primary transition-all font-body-md"
-                          onClick={() => applyMeterSuggestion(s.line_text, editingText.replace(rec.replace, rec.with))}
-                        >
-                          Replace <strong className="line-through text-red-700">{rec.replace}</strong> → <strong className="text-green-700">{rec.with}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  ))
-                ) : (
-                  <div className="bg-surface-container-lowest border border-outline-variant p-4 rounded ambient-shadow text-center text-xs text-on-surface-variant italic">
-                    Line structure satisfies rhyming rules.
-                  </div>
-                )}
-              </aside>
+                        return (
+                          <div key={review.id} className={`bg-surface-container-lowest border border-outline-variant p-4 rounded-lg ambient-shadow relative ${cfg.cardBorder} transition-all hover:shadow-md space-y-3`}>
+                            
+                            {/* Header with Avatar, Name, and Scores */}
+                            <div className="flex justify-between items-start">
+                              <div className="flex items-center gap-2">
+                                <span className={`p-1.5 rounded-full ${cfg.badgeBg} flex items-center justify-center`}>
+                                  <span className="material-symbols-outlined text-[16px]">{cfg.icon}</span>
+                                </span>
+                                <div>
+                                  <span className="font-label-caps text-xs font-bold text-primary block leading-tight">{review.persona_name}</span>
+                                  <span className="text-[10px] text-on-surface-variant font-label-caps">{review.final_emotion}</span>
+                                </div>
+                              </div>
 
-              {/* Center Column: The Canvas */}
-              <section className="col-span-12 md:col-span-6 flex justify-center">
-                <div className="w-full max-w-[720px] bg-surface-container-lowest border border-outline-variant rounded p-[48px] ambient-shadow min-h-[500px] relative">
-                  <div className="absolute top-4 right-4 flex gap-2 opacity-30">
-                    <span className="material-symbols-outlined text-sm animate-pulse">auto_awesome</span>
-                  </div>
-                  <div className="font-verse-primary text-verse-primary text-primary leading-loose whitespace-pre-wrap">
-                    {editingText}
-                  </div>
-                </div>
-              </section>
+                              {/* Ratings badges */}
+                              <div className="flex flex-col items-end gap-1">
+                                <span className={`text-xs px-2.5 py-0.5 rounded font-bold ${cfg.badgeBg}`}>
+                                  {review.rating}/10
+                                </span>
+                                <div className="flex gap-2 text-[10px] font-mono text-on-surface-variant">
+                                  <span title="Appeal Score" className="flex items-center gap-0.5">
+                                    <span className="material-symbols-outlined text-[11px] text-amber-500">star</span>
+                                    {appeal}
+                                  </span>
+                                  <span title="Engagement Score" className="flex items-center gap-0.5">
+                                    <span className="material-symbols-outlined text-[11px] text-emerald-500">bolt</span>
+                                    {engagement}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
 
-              {/* Right Column: Audience Agent (Sentiment, Appeal & Engagement) */}
-              <aside className="col-span-12 md:col-span-4 space-y-stack-md">
-                <div className="flex items-center justify-between mb-3 border-b border-outline-variant pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-on-tertiary-container" style={{ fontVariationSettings: '"FILL" 1' }}>groups</span>
-                    <div>
-                      <h3 className="font-label-caps text-label-caps text-on-tertiary-container tracking-widest uppercase font-bold">Audience Agent</h3>
-                      <p className="text-[10px] text-on-surface-variant">Perception, Appeal & Engagement</p>
-                    </div>
-                  </div>
-                  <button 
-                    className="flex items-center gap-1 bg-surface-container-high hover:bg-surface-container-highest text-primary text-[11px] font-label-caps uppercase px-3 py-1.5 rounded transition-all shadow-xs disabled:opacity-50"
-                    onClick={runAudienceEvaluation}
-                    disabled={isEvaluatingAudience || (!editingText && !editingTitle)}
-                    title="Re-run Audience Agent on this poem"
-                  >
-                    <span className={`material-symbols-outlined text-[14px] ${isEvaluatingAudience ? "animate-spin text-secondary" : ""}`}>refresh</span>
-                    <span>{isEvaluatingAudience ? "Evaluating..." : "Re-evaluate"}</span>
-                  </button>
-                </div>
+                            {/* Core Suggestion */}
+                            <div className="bg-surface-container-low p-3 rounded text-xs text-on-surface leading-relaxed italic border border-outline-variant/60">
+                              "{review.suggestion}"
+                            </div>
 
-                {/* Persona Filter Pills */}
-                <div className="flex flex-wrap gap-1.5 pb-2">
-                  {["all", "romantic", "critic", "instagram", "aggregator"].map(flt => (
-                    <button
-                      key={flt}
-                      onClick={() => setAudienceFilter(flt)}
-                      className={`text-[10px] uppercase font-label-caps px-2.5 py-1 rounded-full transition-all ${
-                        audienceFilter === flt
-                          ? "bg-primary text-on-primary font-bold shadow-xs"
-                          : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-primary"
-                      }`}
-                    >
-                      {flt === "all" ? "All Reviews" : flt === "aggregator" ? "Consensus" : flt}
-                    </button>
-                  ))}
-                </div>
+                            {/* Favorite Line Callout */}
+                            {review.favorite_line && (
+                              <div className="p-2.5 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 rounded text-[11px]">
+                                <span className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1 mb-0.5">
+                                  <span className="material-symbols-outlined text-[13px]">grade</span>
+                                  Favorite Line
+                                </span>
+                                <p className="italic text-on-surface line-clamp-2">"{review.favorite_line}"</p>
+                              </div>
+                            )}
 
-                {/* Reviews List */}
-                <div className="space-y-4">
-                  {poemDetails?.audience_reviews
-                    ?.filter(review => {
-                      if (audienceFilter === "all") return true;
-                      const name = (review.persona_name || "").toLowerCase();
-                      if (audienceFilter === "romantic") return name.includes("romantic");
-                      if (audienceFilter === "critic") return name.includes("critic");
-                      if (audienceFilter === "instagram") return name.includes("instagram");
-                      if (audienceFilter === "aggregator") return name.includes("aggregator");
-                      return true;
-                    })
-                    .map(review => {
-                      const cfg = getPersonaConfig(review.persona_name);
-                      const strengths = review.strengths_json || review.strengths || [];
-                      const weaknesses = review.weaknesses_json || review.weaknesses || [];
-                      const enhancements = review.actionable_enhancements_json || review.actionable_enhancements || [];
-                      const appeal = review.appeal_score || review.rating;
-                      const engagement = review.engagement_score || review.rating;
+                            {/* Confusing / Stumble Line Callout */}
+                            {review.confusing_line && (
+                              <div className="p-2.5 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded text-[11px]">
+                                <span className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1 mb-0.5">
+                                  <span className="material-symbols-outlined text-[13px]">report_problem</span>
+                                  Line Breaking Engagement
+                                </span>
+                                <p className="italic text-on-surface line-clamp-2">"{review.confusing_line}"</p>
+                              </div>
+                            )}
 
-                      return (
-                        <div key={review.id} className={`bg-surface-container-lowest border border-outline-variant p-4 rounded-lg ambient-shadow relative ${cfg.cardBorder} transition-all hover:shadow-md space-y-3`}>
-                          
-                          {/* Header with Avatar, Name, and Scores */}
-                          <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-2">
-                              <span className={`p-1.5 rounded-full ${cfg.badgeBg} flex items-center justify-center`}>
-                                <span className="material-symbols-outlined text-[16px]">{cfg.icon}</span>
-                              </span>
+                            {/* Strengths Tags */}
+                            {strengths.length > 0 && (
                               <div>
-                                <span className="font-label-caps text-xs font-bold text-primary block leading-tight">{review.persona_name}</span>
-                                <span className="text-[10px] text-on-surface-variant font-label-caps">{review.final_emotion}</span>
+                                <span className="text-[10px] uppercase tracking-wider font-bold text-on-surface-variant block mb-1">Strengths</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {strengths.map((str, sIdx) => (
+                                    <span key={sIdx} className="bg-emerald-100/70 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                                      <span className="material-symbols-outlined text-[10px]">check</span>
+                                      {str}
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
+                            )}
 
-                            {/* Ratings badges */}
-                            <div className="flex flex-col items-end gap-1">
-                              <span className={`text-xs px-2.5 py-0.5 rounded font-bold ${cfg.badgeBg}`}>
-                                {review.rating}/10
-                              </span>
-                              <div className="flex gap-2 text-[10px] font-mono text-on-surface-variant">
-                                <span title="Appeal Score" className="flex items-center gap-0.5">
-                                  <span className="material-symbols-outlined text-[11px] text-amber-500">star</span>
-                                  {appeal}
-                                </span>
-                                <span title="Engagement Score" className="flex items-center gap-0.5">
-                                  <span className="material-symbols-outlined text-[11px] text-emerald-500">bolt</span>
-                                  {engagement}
-                                </span>
+                            {/* Weaknesses Tags */}
+                            {weaknesses.length > 0 && (
+                              <div>
+                                <span className="text-[10px] uppercase tracking-wider font-bold text-on-surface-variant block mb-1">Room for Growth</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {weaknesses.map((w, wIdx) => (
+                                    <span key={wIdx} className="bg-amber-100/70 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                                      <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
+                                      {w}
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
+                            )}
+
+                            {/* What to Enhance for Greater Appeal & Engagement */}
+                            {enhancements.length > 0 && (
+                              <div className="bg-primary-container/15 border border-primary/20 rounded p-3 space-y-1.5 mt-2">
+                                <div className="flex items-center gap-1 text-[11px] font-bold text-primary uppercase tracking-wide">
+                                  <span className="material-symbols-outlined text-[14px]">auto_fix_high</span>
+                                  <span>How to Enhance Appeal & Engagement:</span>
+                                </div>
+                                <ul className="space-y-1 text-xs text-on-surface leading-normal pl-3 list-disc">
+                                  {enhancements.map((enh, eIdx) => (
+                                    <li key={eIdx} className="font-body-md text-[11px]">{enh}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
                           </div>
-
-                          {/* Core Suggestion */}
-                          <div className="bg-surface-container-low p-3 rounded text-xs text-on-surface leading-relaxed italic border border-outline-variant/60">
-                            "{review.suggestion}"
-                          </div>
-
-                          {/* Favorite Line Callout */}
-                          {review.favorite_line && (
-                            <div className="p-2.5 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 rounded text-[11px]">
-                              <span className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1 mb-0.5">
-                                <span className="material-symbols-outlined text-[13px]">grade</span>
-                                Favorite Line
-                              </span>
-                              <p className="italic text-on-surface line-clamp-2">"{review.favorite_line}"</p>
-                            </div>
-                          )}
-
-                          {/* Confusing / Stumble Line Callout */}
-                          {review.confusing_line && (
-                            <div className="p-2.5 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded text-[11px]">
-                              <span className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1 mb-0.5">
-                                <span className="material-symbols-outlined text-[13px]">report_problem</span>
-                                Line Breaking Engagement
-                              </span>
-                              <p className="italic text-on-surface line-clamp-2">"{review.confusing_line}"</p>
-                            </div>
-                          )}
-
-                          {/* Strengths Tags */}
-                          {strengths.length > 0 && (
-                            <div>
-                              <span className="text-[10px] uppercase tracking-wider font-bold text-on-surface-variant block mb-1">Strengths</span>
-                              <div className="flex flex-wrap gap-1">
-                                {strengths.map((str, sIdx) => (
-                                  <span key={sIdx} className="bg-emerald-100/70 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                                    <span className="material-symbols-outlined text-[10px]">check</span>
-                                    {str}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Weaknesses Tags */}
-                          {weaknesses.length > 0 && (
-                            <div>
-                              <span className="text-[10px] uppercase tracking-wider font-bold text-on-surface-variant block mb-1">Room for Growth</span>
-                              <div className="flex flex-wrap gap-1">
-                                {weaknesses.map((w, wIdx) => (
-                                  <span key={wIdx} className="bg-amber-100/70 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                                    <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
-                                    {w}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* What to Enhance for Greater Appeal & Engagement */}
-                          {enhancements.length > 0 && (
-                            <div className="bg-primary-container/15 border border-primary/20 rounded p-3 space-y-1.5 mt-2">
-                              <div className="flex items-center gap-1 text-[11px] font-bold text-primary uppercase tracking-wide">
-                                <span className="material-symbols-outlined text-[14px]">auto_fix_high</span>
-                                <span>How to Enhance Appeal & Engagement:</span>
-                              </div>
-                              <ul className="space-y-1 text-xs text-on-surface leading-normal pl-3 list-disc">
-                                {enhancements.map((enh, eIdx) => (
-                                  <li key={eIdx} className="font-body-md text-[11px]">{enh}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                        </div>
-                      );
-                    })}
-                </div>
-              </aside>
+                        );
+                      })}
+                  </div>
+                </aside>
+              )}
 
             </div>
           </div>
